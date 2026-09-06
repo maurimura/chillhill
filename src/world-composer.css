@@ -1,0 +1,219 @@
+.scene-picker {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+.scene-picker legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+#scene-mix {
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 400;
+}
+.scene-recipe {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  text-align: left;
+  width: 100%;
+  padding: 9px;
+  border: 1px solid #dde2d3;
+  border-radius: 10px;
+  background: transparent;
+}
+.scene-recipe:hover {
+  background: #ecefe4;
+}
+.scene-recipe[aria-pressed='true'] {
+  border-color: #879e78;
+  background: #e8eedd;
+}
+.scene-recipe strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 550;
+}
+.scene-recipe small {
+  display: block;
+  font-size: 9px;
+  color: #7c8873;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+.recipe-check {
+  font-size: 12px;
+  margin-left: auto;
+  opacity: 0;
+}
+.scene-recipe[aria-pressed='true'] .recipe-check {
+  opacity: 1;
+}
+.recipe-preview {
+  position: relative;
+  flex: 0 0 54px;
+  height: 54px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: linear-gradient(#c7e2e6 0 44%, #73b2b0 44% 100%);
+}
+.recipe-preview::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #ffedbb;
+  right: 9px;
+  top: 8px;
+}
+.recipe-preview i {
+  position: absolute;
+  width: 49px;
+  height: 80px;
+  background: #b4b883;
+  border-right: 6px solid #d3c79f;
+  transform: rotate(-26deg);
+  left: -21px;
+  top: 20px;
+  border-radius: 45%;
+}
+.recipe-preview.rain {
+  background: linear-gradient(#c9b6b3 0 44%, #799c9e 44%);
+}
+.recipe-preview.highlands {
+  background: #dce5d7;
+}
+.recipe-preview.highlands i {
+  width: 80px;
+  height: 80px;
+  border: 0;
+  border-radius: 35%;
+  transform: rotate(40deg);
+  background: #8b9e76;
+  top: 25px;
+  left: -14px;
+}
+.composer-section {
+  border-top: 1px solid #dce1d2;
+  padding: 13px 0;
+}
+.composer-section summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  list-style-position: inside;
+}
+.composer-section summary:focus-visible {
+  outline: 2px solid #81995e;
+  outline-offset: 4px;
+}
+.composer-section[open] summary {
+  margin-bottom: 16px;
+}
+.composer-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.composer-field {
+  display: grid;
+  gap: 7px;
+  font-size: 10px;
+  margin-bottom: 15px;
+  min-width: 0;
+}
+.composer-field > span {
+  color: #718064;
+}
+.composer-field select,
+.composer-field input {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid #d6ddcc;
+  border-radius: 7px;
+  padding: 10px 8px;
+  background: #f7f7ee;
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+}
+.composer-section .field-note {
+  margin: 9px 0 1px;
+}
+.scene-file-actions {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 3px 0 16px;
+}
+.scene-file-actions .text-button {
+  font-size: 10px;
+  padding: 0;
+}
+.composer-status {
+  color: #738565;
+  font-size: 10px;
+  line-height: 1.6;
+  margin: 8px 0 28px;
+}
+.style-preview.coastal {
+  background: #c7e2e6;
+}
+.style-preview.coastal i {
+  background: #b4b883;
+}
+.style-preview.coastal b {
+  background: #73b2b0;
+}
+/* The game's overlay stays readable at night without changing the workshop or drawer. */
+body.is-night:not(.in-garage) .site-header {
+  color: #e4ece7;
+}
+.is-night .game-shell {
+  color: #e4ece7;
+}
+.is-night .intro h1 em {
+  color: #c2d2b6;
+}
+.is-night .intro p,
+.is-night .intro-kicker,
+.is-night .route-card .eyebrow,
+.is-night .route-distance small,
+.is-night .route-note,
+.is-night .route-drawing,
+.is-night .start-note {
+  color: #c1d1cc;
+}
+.is-night .world-label {
+  border-color: #c1d1cc55;
+}
+.is-night .brand-mark {
+  background: #dce8d915;
+}
+.is-night:not(.in-garage) .sound-button {
+  color: #c1d1cc;
+}
+.is-night:not(.in-garage) .site-header .icon-button:hover,
+.is-night:not(.in-garage) .site-header .garage-nav:hover {
+  background: #dce8d922;
+}
+.is-night .thumb-hint {
+  color: #c1d1cc;
+}
+#weather-icon {
+  display: flex;
+}
+.is-night .driving-guide,
+.is-night .speed-card,
+.is-night .pause-card,
+.is-night .touch-controls {
+  color: var(--ink);
+}
+@media (min-width: 651px) and (pointer: fine) {
+  .is-night .speed-card {
+    color: #e4ece7;
+  }
+}

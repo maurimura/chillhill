@@ -1,0 +1,177 @@
+.site-header .icon-button[aria-expanded='true'] {
+  background: #e5e9dca6;
+  box-shadow: inset 0 0 0 1px #879b6f55;
+}
+.quick-panel {
+  position: fixed;
+  z-index: 20;
+  top: calc(var(--nav-height) + var(--nav-top) + 4px);
+  right: max(30px, env(safe-area-inset-right));
+  width: 330px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - var(--nav-height) - var(--nav-top) - var(--edge-bottom) - 20px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #f5f5e9aa;
+  border-radius: 16px;
+  background: #f5f3ebed;
+  color: var(--ink);
+  box-shadow: 0 12px 40px #243c3020;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  animation: arrive 0.18s ease both;
+}
+.quick-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 21px 18px 16px 22px;
+  flex-shrink: 0;
+}
+.quick-heading .eyebrow {
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  color: #718064;
+}
+.quick-heading h2 {
+  font:
+    400 29px/1.15 'DM Serif Display',
+    serif;
+  margin: 7px 0 0;
+  letter-spacing: -0.5px;
+}
+.quick-heading p {
+  margin: 8px 0 0;
+  font-size: 10px;
+  color: #718064;
+}
+.quick-heading .icon-button {
+  width: 32px;
+  height: 32px;
+}
+.quick-heading .icon {
+  width: 17px;
+  height: 17px;
+}
+.quick-scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 22px 18px;
+  scrollbar-width: thin;
+}
+.quick-panel fieldset {
+  margin-bottom: 0;
+}
+.quick-panel legend {
+  font-size: 8px;
+}
+.quick-panel .car-picker legend {
+  display: none;
+}
+.quick-panel .car-option {
+  padding: 9px;
+}
+.quick-panel .car-profile {
+  flex-basis: 66px;
+  width: 66px;
+}
+.quick-panel .car-picker .field-note {
+  margin: 12px 0 0;
+}
+.garage-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 22px;
+  border-top: 1px solid #d6ddcc;
+  border-radius: 0 0 15px 15px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.garage-link:hover {
+  background: #e5e9dcaa;
+}
+.garage-link span {
+  flex: 1;
+}
+.garage-link small {
+  display: block;
+  color: #718064;
+  font-size: 9px;
+  margin-top: 4px;
+}
+.garage-link .icon:last-child {
+  width: 17px;
+}
+.quick-panel .scene-picker {
+  gap: 6px;
+  margin-bottom: 19px;
+}
+.quick-panel .scene-recipe {
+  padding: 7px;
+  gap: 10px;
+}
+.quick-panel .recipe-preview {
+  flex-basis: 38px;
+  height: 38px;
+}
+.quick-panel .scene-recipe small {
+  display: none;
+}
+.quick-panel .composer-fields {
+  gap: 0 12px;
+}
+.quick-note {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.6;
+  color: #718064;
+}
+.quick-open .intro {
+  visibility: hidden;
+}
+.quick-open .touch-controls {
+  opacity: 0.35;
+  pointer-events: none;
+}
+.is-night:not(.in-garage) .site-header .icon-button[aria-expanded='true'] {
+  background: #dce8d922;
+}
+@media (max-width: 650px) {
+  .quick-panel {
+    right: max(12px, env(safe-area-inset-right));
+    max-height: min(
+      50dvh,
+      calc(100dvh - var(--nav-height) - var(--nav-top) - var(--edge-bottom) - 20px)
+    );
+  }
+  .quick-panel .scene-picker {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-bottom: 14px;
+  }
+  .quick-panel .scene-recipe {
+    flex-direction: column;
+    text-align: center;
+    gap: 6px;
+    padding: 6px;
+  }
+  .quick-panel .recipe-preview {
+    flex-basis: auto;
+    width: 100%;
+    height: 30px;
+  }
+  .quick-panel .scene-recipe strong {
+    font-size: 10px;
+    line-height: 1.3;
+    min-height: 26px;
+  }
+  .quick-panel .recipe-check {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .quick-panel {
+    animation: none;
+  }
+}

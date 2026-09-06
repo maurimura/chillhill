@@ -1,0 +1,74 @@
+{
+  "summer-coast": {
+    "name": "Summer Coast",
+    "description": "Salt air. Open water. Nowhere to rush.",
+    "settings": {
+      "style": "coastal",
+      "landscape": "coast",
+      "season": "summer",
+      "timeOfDay": "day",
+      "weather": "clear",
+      "weatherIntensity": 0.45,
+      "wind": 0.25,
+      "roadSurface": "asphalt",
+      "roadMarkings": "dashed",
+      "roadside": "barriers",
+      "seed": 42,
+      "curves": 0.7,
+      "roadWidth": 10,
+      "grade": 0.06,
+      "terrainHeight": 0.7,
+      "treeDensity": 0.55,
+      "roundness": 0.75,
+      "fog": 0.25
+    }
+  },
+  "coastal-rain": {
+    "name": "Coastal Rain",
+    "description": "A soft rain. The last light on the water.",
+    "settings": {
+      "style": "coastal",
+      "landscape": "coast",
+      "season": "summer",
+      "timeOfDay": "sunset",
+      "weather": "rain",
+      "weatherIntensity": 0.45,
+      "wind": 0.4,
+      "roadSurface": "asphalt",
+      "roadMarkings": "double",
+      "roadside": "barriers",
+      "seed": 42,
+      "curves": 0.7,
+      "roadWidth": 10,
+      "grade": 0.06,
+      "terrainHeight": 0.7,
+      "treeDensity": 0.55,
+      "roundness": 0.75,
+      "fog": 0.5
+    }
+  },
+  "greenridge": {
+    "name": "Greenridge Pass",
+    "description": "The original little downhill escape.",
+    "settings": {
+      "style": "alpine",
+      "landscape": "highlands",
+      "season": "summer",
+      "timeOfDay": "day",
+      "weather": "clear",
+      "weatherIntensity": 0.5,
+      "wind": 0.25,
+      "roadSurface": "asphalt",
+      "roadMarkings": "dashed",
+      "roadside": "posts",
+      "seed": 42,
+      "curves": 1,
+      "roadWidth": 10,
+      "grade": 0.09,
+      "terrainHeight": 1,
+      "treeDensity": 1,
+      "roundness": 0.65,
+      "fog": 0.5
+    }
+  }
+}
