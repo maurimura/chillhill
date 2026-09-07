@@ -144,7 +144,7 @@ async function checkMobileHud(page) {
   });
   const { width, height } = page.viewportSize();
   for (const { score, boxes, speed, speedFont } of cases) {
-    assert.equal(speedFont, '30px', 'touch speed readout remains compact');
+    assert.equal(speedFont, '26px', 'touch speed readout remains compact');
     assert.ok(speed.bottom < height * 0.4, 'speed backplate stays above the player-car area');
     for (const [index, box] of boxes.entries()) {
       assert.ok(

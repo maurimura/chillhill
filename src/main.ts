@@ -1,5 +1,6 @@
 import './style.css';
 import './scoreboard.css';
+import './mobile-hud.css';
 import '@fontsource-variable/dm-sans';
 import '@fontsource/dm-serif-display/latin-400.css';
 import '@fontsource/dm-serif-display/latin-400-italic.css';
@@ -736,7 +737,7 @@ function frame(time: number) {
     !inGarage &&
     !document.hidden &&
     !(mode === 'challenge' && challenge.phase === 'gameover');
-  const input = controls.read();
+  const input = controls.read(mode, state.speed);
   if (active) {
     const worldPatch = stepWorldClock(worldClock, settings, elapsed);
     if (Object.keys(worldPatch).length) {

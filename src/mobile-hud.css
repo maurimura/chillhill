@@ -1,0 +1,186 @@
+/* Touch play keeps the middle of the scene for the road, not information cards.
+   Garage and desktop layouts retain their full controls and detail. */
+@media (max-width: 650px), (pointer: coarse) {
+  body:not(.in-garage) {
+    --nav-height: 52px;
+    --touch-pad-size: 128px;
+    --touch-feedback-width: min(230px, calc(100vw - var(--touch-pad-size) - 36px));
+  }
+
+  .is-driving .speed-card {
+    top: calc(var(--nav-height) + var(--nav-top) + 6px);
+    width: 92px;
+    min-width: 92px;
+    height: 36px;
+    padding: 4px 7px 7px;
+    gap: 4px;
+    border-radius: 10px;
+  }
+  .is-driving .speed-number {
+    font-size: 26px;
+    letter-spacing: -1px;
+  }
+  .is-driving .speed-unit {
+    font-size: 8px;
+    letter-spacing: 0.4px;
+  }
+  .is-driving .speed-track {
+    bottom: 4px;
+    left: 7px;
+    right: 7px;
+  }
+
+  .challenge-hud {
+    display: flex;
+    flex-wrap: nowrap;
+    width: auto;
+    max-width: calc(
+      100% - max(12px, env(safe-area-inset-left)) - max(12px, env(safe-area-inset-right)) - 104px
+    );
+    height: 36px;
+    top: calc(var(--nav-height) + var(--nav-top) + 6px);
+    gap: 12px;
+    padding: 4px 9px;
+    border-radius: 10px;
+  }
+  .challenge-hud > .eyebrow,
+  .challenge-hud > .score-category,
+  .challenge-hud > .score-streak,
+  .challenge-hud .score-stats > span:last-child {
+    display: none;
+  }
+  .challenge-hud .score-total strong {
+    font-size: 20px;
+    white-space: nowrap;
+  }
+  .challenge-hud .score-total span {
+    font-size: 9px;
+  }
+  .challenge-hud .score-stats {
+    display: block;
+    flex: 0 0 auto;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .challenge-hud .score-stats strong {
+    font-size: 14px;
+  }
+
+  .is-driving .bottom-hud {
+    left: max(12px, env(safe-area-inset-left));
+    right: max(12px, env(safe-area-inset-right));
+    bottom: calc(12px + var(--edge-bottom));
+  }
+  .is-driving .route-card {
+    display: block;
+    width: auto;
+    max-width: var(--touch-feedback-width);
+    padding: 6px 8px;
+    background: var(--overlay-surface);
+    border: 1px solid var(--overlay-line);
+    border-radius: 9px;
+  }
+  .is-driving .route-card::before,
+  .is-driving .route-drawing,
+  .is-driving .route-card .eyebrow,
+  .is-driving .route-note,
+  .is-driving .world-clock-label,
+  .is-driving:has(#challenge-hud:not([hidden])) .route-card {
+    display: none;
+  }
+  .is-driving .route-distance {
+    margin: 0;
+    font-size: 13px;
+    letter-spacing: 0;
+  }
+  .is-driving .route-distance small {
+    display: inline;
+    margin: 0;
+    font-size: 9px;
+  }
+
+  .is-driving .touch-controls {
+    left: auto;
+    right: max(12px, env(safe-area-inset-right));
+    bottom: calc(12px + var(--edge-bottom));
+    width: var(--touch-pad-size);
+  }
+  .is-driving .thumb-hint {
+    display: none;
+  }
+  .is-driving #thumb-pad {
+    width: var(--touch-pad-size);
+    height: var(--touch-pad-size);
+    border-radius: 30px;
+  }
+  .is-driving #thumb-pad::before {
+    height: 46%;
+    top: 27%;
+  }
+  .is-driving #thumb-pad::after {
+    width: 46%;
+    left: 27%;
+  }
+  .is-driving .pad-left,
+  .is-driving .pad-right {
+    top: calc(50% - 12px);
+  }
+  .is-driving .pad-up,
+  .is-driving .pad-down {
+    font-size: 9px;
+  }
+
+  .is-driving .driving-feedback {
+    left: max(12px, env(safe-area-inset-left));
+    bottom: calc(12px + var(--edge-bottom));
+    width: var(--touch-feedback-width);
+    transform: none;
+  }
+  .is-driving .challenge-message {
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 5px 8px;
+    padding: 8px;
+    font-size: 11px;
+    line-height: 1.35;
+  }
+  .is-driving .driving-sign {
+    width: 24px;
+    height: 24px;
+  }
+  .is-driving .feedback-copy {
+    gap: 3px;
+  }
+  .is-driving .recovery-track {
+    height: 3px;
+    margin: 0;
+  }
+  .is-driving .recovery-warning:not([data-state='offroad']) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .is-driving .recovery-warning:not([data-state='offroad']) .feedback-sign,
+  .is-driving .recovery-warning:not([data-state='offroad']) #road-recovery-instruction {
+    display: none;
+  }
+  .is-driving .score-feedback {
+    position: fixed;
+    top: auto;
+    left: max(12px, env(safe-area-inset-left));
+    bottom: calc(12px + var(--edge-bottom));
+    max-width: var(--touch-feedback-width);
+    padding: 8px 10px;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  /* One message at a time: a recovery/crash warning takes priority over points. */
+  .is-driving:has(.driving-feedback .challenge-message:not([hidden])) .score-feedback {
+    display: none;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 600px) and (pointer: coarse) {
+  body:not(.in-garage) {
+    --nav-height: 48px;
+    --touch-pad-size: 108px;
+    --touch-feedback-width: min(230px, 34vw);
+  }
+}

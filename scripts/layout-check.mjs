@@ -181,7 +181,11 @@ export async function checkLayout(browser, origin, errors) {
       await page.locator('#open-world-menu').click();
       const panel = await page.locator('#world-menu').boundingBox();
       assert.ok(panel.x >= 0 && panel.x + panel.width <= viewport.width);
-      assert.ok(panel.y >= 60 && panel.y + panel.height <= viewport.height);
+      const header = await page.locator('.site-header').boundingBox();
+      assert.ok(
+        panel.y >= header.y + header.height && panel.y + panel.height <= viewport.height,
+        'menus sit below the actual desktop or compact touch header',
+      );
       assert.ok(
         await page.locator('#world-menu').evaluate((el) => el.scrollWidth <= el.clientWidth),
       );

@@ -93,7 +93,7 @@ export async function checkSpeedWidth(browser, origin, errors) {
           );
         }
         if (touch && phase === 'driving')
-          assert.equal(baseline.width, 108, 'touch driving readout keeps its compact width');
+          assert.equal(baseline.width, 92, 'touch driving readout keeps its compact width');
         if (phase === 'driving')
           await page.screenshot({ path: `artifacts/speed-width-${viewport.width}.png` });
       }

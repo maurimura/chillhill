@@ -29,6 +29,7 @@ import { checkHitboxes } from './hitbox-check.mjs';
 import { checkPauseFocus } from './pause-focus-check.mjs';
 import { checkPerformanceRegressions } from './performance-regression-check.mjs';
 import { checkUnits } from './units-check.mjs';
+import { checkMobileUX } from './mobile-ux-check.mjs';
 
 // Uses an isolated browser profile; does not touch your normal Chrome session.
 const browser = await chromium.launch({
@@ -565,6 +566,7 @@ try {
   await checkWorldClock(browser, origin, errors);
   await checkUnits(browser, origin, errors);
   await checkSpeedWidth(browser, origin, errors);
+  await checkMobileUX(browser, origin, errors);
   await checkChallenge(browser, origin, errors);
   await checkScoreboard(browser, origin, errors);
   await checkOnlineScoreboard(browser, origin, errors);

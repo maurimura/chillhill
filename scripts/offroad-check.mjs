@@ -123,11 +123,16 @@ export async function checkOffRoad(browser, origin, errors) {
       const legend = (await page.locator('.driving-guide').isVisible())
         ? await page.locator('.driving-guide').boundingBox()
         : await page.locator('.touch-controls').boundingBox();
-      assert.ok(
-        box.y + box.height <= legend.y - 8,
-        'the indicator sits above the controls with a gap',
-      );
-      assert.ok(Math.abs(box.x + box.width / 2 - viewport.width / 2) < 1);
+      if (await page.locator('.driving-guide').isVisible()) {
+        assert.ok(box.y + box.height <= legend.y - 8, 'desktop indicators sit above the keys');
+        assert.ok(Math.abs(box.x + box.width / 2 - viewport.width / 2) < 1);
+      } else {
+        assert.ok(
+          box.x + box.width <= legend.x - 8,
+          'touch warnings sit beside the pad, away from the road',
+        );
+        assert.ok(box.y >= viewport.height * 0.7, 'touch warnings stay at the bottom edge');
+      }
       assert.notEqual(
         await page.locator('#road-recovery-meter').getAttribute('aria-valuenow'),
         '0',
@@ -165,7 +170,14 @@ export async function checkOffRoad(browser, origin, errors) {
         'cooldown',
       );
       assert.equal(await page.locator('#recovery-cliff-sign').isVisible(), false);
-      assert.equal(await page.locator('#recovery-road-sign').isVisible(), true);
+      const compact = await page.evaluate(
+        () => matchMedia('(max-width: 650px), (pointer: coarse)').matches,
+      );
+      assert.equal(
+        await page.locator('#recovery-road-sign').isVisible(),
+        !compact,
+        'mobile cooldown uses a compact meter instead of a second sign',
+      );
       assert.match(await page.locator('#road-recovery-time').innerText(), /Refill in/);
       assert.ok(
         (await snapshot()).challenge.offRoad.exposure > 0,
@@ -237,7 +249,7 @@ export async function checkOffRoad(browser, origin, errors) {
     }
   }
   console.log(
-    'PASS: cliff signs above keyboard/touch controls, live recovery, shared budget, five-second cooldown and gradual refill, pause/menu freeze, timeout and safe respawn across desktop/mobile/landscape.',
+    'PASS: cliff signs above desktop keys / beside touch controls, live recovery, shared budget, compact mobile cooldown, five-second refill delay, pause/menu freeze, timeout and safe respawn across desktop/mobile/landscape.',
   );
 }
 

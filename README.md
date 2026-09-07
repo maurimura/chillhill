@@ -46,6 +46,10 @@ Space also brakes. Enter starts or resumes **Keep wandering** (including numpad 
 
 The default **Easy drive** mode uses assisted, road-relative arcade driving: the car follows the road direction while you control lateral movement. The rear swings around the front axle with a damped yaw response and retained sideways momentum. Release steering or countersteer to let the tail settle; drifting preserves downhill speed. Soft road edges account for the swinging rear bumper. A held brake freezes both translation and rotation. It is a foundation for testing the feel, not a full tire/suspension simulation.
 
+On touch screens, Drift king uses a progressive thumb response: small movements make gentle corrections, particularly at speed, while the edges retain full steering. A wider pedal band and separate engage/release thresholds reduce accidental throttle/brake changes. Rotating the device releases held input. This only shapes the controls; keyboard input, road assistance, collisions, speed limits and scoring rules are unchanged.
+
+Mobile play uses compact score/lives/speed badges, a generous thumb target, and lower-left recovery/crash signs. Safety warnings take priority over points popups so they do not stack over the road. Secondary route detail is hidden while driving; Easy drive keeps a small distance badge. The garage and desktop keep their full layouts. Run `node scripts/mobile-ux-check.mjs` with local Vite to check touch gestures, rotation, contrast, clear road space and phone/tablet layouts.
+
 ### Easy drive or Drift king
 
 The welcome and pause cards contain only **Easy drive** and **Drift king**. Click either to start immediately; on the pause card the current mode resumes your run and the other starts a fresh one. **Easy drive** is unchanged: automatic coasting, forgiving edges, no traffic or lives. **Drift king** retains smooth, easy drifting, but you control acceleration and the car's direction; curves no longer steer for you and the road edge is not clamped. Hold W/up (or push the thumb pad up) to accelerate; releasing the accelerator coasts down slowly.
