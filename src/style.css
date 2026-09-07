@@ -1782,6 +1782,15 @@ body:not(.in-garage) .site-header :focus-visible,
     transform: translateY(-166px);
   }
 }
+@media (max-width: 420px) {
+  /* Keep all driving actions usable without squeezing the place into initials. */
+  .site-header:has(#drive-toolbar:not([hidden])) .world-label {
+    display: none;
+  }
+  .site-header:has(#drive-toolbar:not([hidden])) .nav-identity {
+    flex: 0 0 auto;
+  }
+}
 @media (max-width: 380px) {
   .is-driving .speed-card {
     transform: none;

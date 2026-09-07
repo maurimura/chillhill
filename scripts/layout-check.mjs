@@ -5,6 +5,10 @@ const overlaps = (a, b) =>
   a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 
 async function checkNav(page, garage) {
+  const compactDrive =
+    !garage &&
+    page.viewportSize().width <= 420 &&
+    (await page.locator('#drive-toolbar').isVisible());
   assert.equal(await page.locator('nav').count(), 1, 'one shared navigation bar');
   const github = page.locator('#github-link');
   assert.equal(await github.isVisible(), true);
@@ -41,47 +45,49 @@ async function checkNav(page, garage) {
   assert.equal(await page.locator('.site-header #open-garage, .weather-label').count(), 0);
   assert.equal(await page.locator('#back-drive').isVisible(), garage);
   assert.equal(await page.locator('#garage-title').isVisible(), garage);
-  assert.equal(await page.locator('#world-label').isVisible(), !garage);
+  assert.equal(await page.locator('#world-label').isVisible(), !garage && !compactDrive);
   assert.equal(await page.locator('.world-label svg, .world-icon, .world-subtitle').count(), 0);
   if (!garage) {
-    const brand = await page.locator('.brand').boundingBox();
-    const road = await page.locator('#world-label').boundingBox();
-    assert.ok(road.x >= brand.x + brand.width, 'road name sits beside the shared brand');
-    assert.ok(Math.abs(road.y + road.height / 2 - (brand.y + brand.height / 2)) < 1);
-    const label = await page.locator('#place').boundingBox();
-    assert.ok(
-      Math.abs(label.y + label.height / 2 - (brand.y + brand.height / 2)) < 1,
-      'the landscape line box stays aligned with the brand',
-    );
-    const spacing = await page.locator('.nav-identity').evaluate((el) => {
-      const glass = getComputedStyle(el, '::before');
-      const road = getComputedStyle(el.querySelector('#world-label'));
-      return {
-        inset: [glass.top, glass.right, glass.bottom, glass.left],
-        divider: parseFloat(road.borderLeftWidth),
-      };
-    });
-    assert.deepEqual(spacing.inset, ['0px', '0px', '0px', '0px']);
-    assert.ok(
-      Math.abs(mark.y - identity.y - (identity.y + identity.height - mark.y - mark.height)) < 1,
-    );
-    if (spacing.divider) {
+    if (!compactDrive) {
+      const brand = await page.locator('.brand').boundingBox();
+      const road = await page.locator('#world-label').boundingBox();
+      assert.ok(road.x >= brand.x + brand.width, 'road name sits beside the shared brand');
+      assert.ok(Math.abs(road.y + road.height / 2 - (brand.y + brand.height / 2)) < 1);
+      const label = await page.locator('#place').boundingBox();
       assert.ok(
-        Math.abs(
-          label.x -
-            road.x -
-            spacing.divider -
-            (identity.x + identity.width - label.x - label.width),
-        ) < 1,
-        'landscape lettering has equal space between the divider and the right edge of the glass',
+        Math.abs(label.y + label.height / 2 - (brand.y + brand.height / 2)) < 1,
+        'the landscape line box stays aligned with the brand',
       );
-    } else {
+      const spacing = await page.locator('.nav-identity').evaluate((el) => {
+        const glass = getComputedStyle(el, '::before');
+        const road = getComputedStyle(el.querySelector('#world-label'));
+        return {
+          inset: [glass.top, glass.right, glass.bottom, glass.left],
+          divider: parseFloat(road.borderLeftWidth),
+        };
+      });
+      assert.deepEqual(spacing.inset, ['0px', '0px', '0px', '0px']);
       assert.ok(
-        Math.abs(label.x + label.width / 2 - (road.x + road.width / 2)) < 1,
-        'wrapped mobile landscape names are centered in their available space',
+        Math.abs(mark.y - identity.y - (identity.y + identity.height - mark.y - mark.height)) < 1,
       );
+      if (spacing.divider) {
+        assert.ok(
+          Math.abs(
+            label.x -
+              road.x -
+              spacing.divider -
+              (identity.x + identity.width - label.x - label.width),
+          ) < 1,
+          'landscape lettering has equal space between the divider and the right edge of the glass',
+        );
+      } else {
+        assert.ok(
+          Math.abs(label.x + label.width / 2 - (road.x + road.width / 2)) < 1,
+          'wrapped mobile landscape names are centered in their available space',
+        );
+      }
+      assert.ok(road.x + road.width <= actions.x, 'road name does not cover controls');
     }
-    assert.ok(road.x + road.width <= actions.x, 'road name does not cover controls');
     assert.deepEqual(
       await page.locator('.site-header').evaluate((nav) => {
         const style = getComputedStyle(nav);
