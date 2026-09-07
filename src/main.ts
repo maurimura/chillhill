@@ -62,6 +62,8 @@ const icons = {
   hill: '<path d="m1 20.5 7-12 5 8 4-6 6 10M5 20.5h13"/><circle cx="18" cy="5.5" r="2"/>',
   car: '<path d="m5 9 2-5h10l2 5M3 10l2-1h14l2 1v8H3v-8Zm2 8v2m14-2v2M6 13h2m8 0h2M9 16h6"/>',
   garage: '<path d="M3 21V8l9-5 9 5v13M7 21V11h10v10M7 15h10M7 18h10"/>',
+  github:
+    '<path d="M9 21v-3.5c-3.6.8-3.7-1.7-5-2.2M15 21v-3.7c0-1-.4-1.7-1-2.1 3.3-.4 6-1.8 6-5.5 0-1.3-.4-2.4-1.3-3.3.2-.9.2-2-.3-3.1-1.5 0-2.7.8-3.5 1.4a11.7 11.7 0 0 0-5.8 0C8.3 4.1 7.1 3.3 5.6 3.3c-.5 1.1-.5 2.2-.3 3.1C4.4 7.3 4 8.4 4 9.7c0 3.7 2.7 5.1 6 5.5-.6.4-1 1.1-1 2.1"/>',
   tune: '<path d="M4 7h7m4 0h5M4 17h3m4 0h9"/><circle cx="13" cy="7" r="2"/><circle cx="9" cy="17" r="2"/>',
   sound: '<path d="m11 5-6 4H2v6h3l6 4V5Zm4 3a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>',
   arrow: '<path d="M4 12h15m-6-6 6 6-6 6"/>',
@@ -109,6 +111,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <button class="icon-button" id="open-world-menu" data-quick-menu="world-menu" aria-label="Landscape & weather" aria-haspopup="dialog" aria-controls="world-menu" aria-expanded="false" title="Landscape & weather"><span id="weather-icon">${icon('sun')}</span></button>
       <button class="icon-button sound-button" id="sound" data-quick-menu="music-menu" aria-label="Music & ambience" aria-haspopup="dialog" aria-controls="music-menu" aria-expanded="false" title="Music & ambience">${icon('sound')}<span class="sound-slash"></span></button>
       <button class="icon-button" id="open-settings" aria-label="Advanced settings" aria-haspopup="dialog" aria-controls="settings-dialog" title="Advanced settings">${icon('tune')}</button>
+      <a class="icon-button github-link" id="github-link" href="https://github.com/maurimura/chillhill" target="_blank" rel="noopener noreferrer" aria-label="View chillhill on GitHub (opens in a new tab)" title="chillhill on GitHub">${icon('github')}</a>
     </div>
   </nav>
   <main class="game-shell" id="game-shell">

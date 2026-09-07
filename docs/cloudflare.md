@@ -2,7 +2,7 @@
 
 ## GitHub CI/CD
 
-Repository: [maurimura/chillhill](https://github.com/maurimura/chillhill) (private).
+Repository: [maurimura/chillhill](https://github.com/maurimura/chillhill) (public).
 `.github/workflows/ci.yml` runs on pull requests, pushes to `main`, and manual dispatch.
 It installs locked dependencies with Node 24, runs the unit/API tests, type-checks
 and builds the game, and checks the sharing preview with a JavaScript-disabled

@@ -6,6 +6,12 @@ const overlaps = (a, b) =>
 
 async function checkNav(page, garage) {
   assert.equal(await page.locator('nav').count(), 1, 'one shared navigation bar');
+  const github = page.locator('#github-link');
+  assert.equal(await github.isVisible(), true);
+  assert.equal(await github.getAttribute('href'), 'https://github.com/maurimura/chillhill');
+  assert.equal(await github.getAttribute('target'), '_blank');
+  assert.equal(await github.getAttribute('rel'), 'noopener noreferrer');
+  assert.match(await github.getAttribute('aria-label'), /GitHub.*new tab/);
   const nav = await page.locator('.site-header').boundingBox();
   const identity = await page.locator('.nav-identity').boundingBox();
   const actions = await page.locator('.header-actions').boundingBox();
