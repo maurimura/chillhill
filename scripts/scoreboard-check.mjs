@@ -77,6 +77,9 @@ export async function checkScoreboard(browser, origin, errors) {
       assert.equal(await page.locator('#run-leaderboard').isVisible(), false);
       assert.equal(await page.locator('#scoreboard-dialog').isVisible(), false);
       assert.equal(await page.locator('#open-scoreboard').isVisible(), false);
+      const details = page.locator('#run-results details');
+      if ((await details.count()) && !(await details.evaluate((element) => element.open)))
+        await details.locator('summary').click();
       assert.match(await page.locator('#run-results').innerText(), /mi/);
       assert.doesNotMatch(
         await page.locator('#run-results').innerText(),
@@ -108,9 +111,10 @@ export async function checkScoreboard(browser, origin, errors) {
       await page.locator('#close-car-menu').click();
       assert.equal((await snapshot()).scoreRun.category, 'custom');
       assert.equal(
-        await page.evaluate(
-          () => JSON.parse(localStorage.getItem('chillhill.scores.v3')).records.length,
-        ),
+        await page.evaluate(async () => {
+          const { scoreStorageKey } = await import('/src/scoreboard.ts');
+          return JSON.parse(localStorage.getItem(scoreStorageKey)).records.length;
+        }),
         1,
         'unfinished runs never save',
       );

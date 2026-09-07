@@ -65,6 +65,9 @@ function storage() {
 }
 
 test('Standard uses canonical physics, allowing any starting car/seed and visual preferences', () => {
+  assert.equal(standardDriving.maxSpeed, 280);
+  assert.equal(scoringDefaults.version, 4);
+  assert.equal(createScoreRun({ ...settings, maxSpeed: 110 }).category, 'custom');
   const run = createScoreRun(settings, 'run');
   assert.equal(run.category, 'standard');
   const visual = {
@@ -205,10 +208,13 @@ test('current rules leave older personal records untouched', () => {
   const original = JSON.stringify({ version: 1, records: [{ ...record(), version: 1 }] });
   disk.setItem('chillhill.scores.v1', original);
   disk.setItem('chillhill.scores.v2', original);
+  const v3 = JSON.stringify({ version: 3, records: [{ ...record(), version: 3 }] });
+  disk.setItem('chillhill.scores.v3', v3);
   const store = new ScoreboardStore(disk);
   assert.equal(store.records.length, 0);
   store.save(record('new-rules'));
   assert.equal(disk.getItem('chillhill.scores.v1'), original);
   assert.equal(disk.getItem('chillhill.scores.v2'), original);
+  assert.equal(disk.getItem('chillhill.scores.v3'), v3);
   assert.equal(readScores(disk).length, 1);
 });

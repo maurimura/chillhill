@@ -25,11 +25,12 @@ try {
     );
     assert.equal(await page.locator('#place').innerText(), 'THE SUNWASHED COAST');
     await page.locator('#open-settings').click();
-    assert.equal(await page.locator('#maxSpeed').inputValue(), '110');
+    assert.equal(await page.locator('#maxSpeed').inputValue(), '280');
+    assert.equal(await page.locator('#maxSpeed').getAttribute('max'), '280');
     assert.equal(await page.locator('#units').inputValue(), 'auto');
     assert.equal(
       await page.locator('#maxSpeed-value').innerText(),
-      expected === 'KM/H' ? '110 km/h' : '68.4 mph',
+      expected === 'KM/H' ? '280 km/h' : '174 mph',
     );
     await page.locator('#maxSpeed').fill('75');
     await page.reload();
@@ -41,7 +42,7 @@ try {
       'saved choices survive new defaults',
     );
     await page.locator('#reset-settings').click();
-    assert.equal(await page.locator('#maxSpeed').inputValue(), '110');
+    assert.equal(await page.locator('#maxSpeed').inputValue(), '280');
     await page.locator('#close-settings').click();
     await page.locator('#open-car-menu').click();
     assert.match(
@@ -81,7 +82,7 @@ try {
   );
   await page.close();
   console.log(
-    'PASS: production country beats browser language, shared HUD/menu/garage units, coast/110 defaults, saved choices, reset, and manual-choice race.',
+    'PASS: production country beats browser language, shared HUD/menu/garage units, coast/280 defaults, saved choices, reset, and manual-choice race.',
   );
 } finally {
   await browser.close();

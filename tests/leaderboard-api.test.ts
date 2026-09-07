@@ -368,7 +368,7 @@ test('impossible totals, versions, elapsed time and physical stats cannot enter 
     { score: Infinity },
     { score: -1 },
     { duration: 116 },
-    { topSpeed: 112 },
+    { topSpeed: standardDriving.maxSpeed + 2 },
     { averageSpeed: 90 },
     { distance: 100_000 },
     { shoulderSeconds: 100 },
@@ -384,6 +384,26 @@ test('impossible totals, versions, elapsed time and physical stats cannot enter 
   for (const patch of patches) {
     const session = await start();
     assert.equal((await finish(session, record(patch))).status, 400, JSON.stringify(patch));
+  }
+});
+
+test('280 km/h runs can rank in both categories, but exceeding the cap is rejected', async () => {
+  for (const category of ['standard', 'custom'] as const) {
+    const { start, finish } = setup();
+    const session = await start(category);
+    const row = record({
+      category,
+      customReasons: category === 'custom' ? ['setup'] : [],
+      topSpeed: 280,
+      averageSpeed: 180,
+      distance: 4500,
+    });
+    assert.equal((await finish(session, row)).status, 200);
+    const tooFast = await start(category);
+    assert.equal(
+      (await finish(tooFast, { ...row, id: crypto.randomUUID(), topSpeed: 281 })).status,
+      400,
+    );
   }
 });
 

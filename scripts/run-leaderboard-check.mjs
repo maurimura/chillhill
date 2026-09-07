@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import { scoringDefaults } from '../src/config/scoring.ts';
 
 // The real production bootstrap, controls and game-over lifecycle, with all
 // API calls intercepted. Never submit test names to the deployed leaderboard.
@@ -35,7 +36,7 @@ try {
       releaseName = resolve;
     });
     const record = {
-      version: 3,
+      version: scoringDefaults.version,
       id: 'public-fixture',
       seed: 42,
       car: 'astra',
@@ -80,7 +81,7 @@ try {
         const category = url.searchParams.get('category');
         return route.fulfill({
           json: {
-            version: 3,
+            version: scoringDefaults.version,
             category,
             entries: Array.from({ length: 10 }, (_, i) =>
               postedName && i === rank - 1

@@ -8,7 +8,7 @@ import { challengeDefaults } from '../src/config/challenge.ts';
 import { initialScore, stepDriftScore } from '../src/game/scoring.ts';
 
 test('challenge touch steering is continuous, symmetric and gentle near center', () => {
-  for (const speed of [0, 10, 110 / 3.6]) {
+  for (const speed of [0, 10, 110 / 3.6, 280 / 3.6]) {
     let previous = 0;
     for (let i = 0; i <= 100; i++) {
       const raw = i / 100;
@@ -81,8 +81,8 @@ test('the same short thumb correction produces less heading change at speed', ()
   assert.equal(softened.travelled, raw.travelled, 'distance-based scoring stays unchanged');
 });
 
-test('touch lane changes have a subtle tail swing and settle after release at every speed', () => {
-  const config = { ...standardDriving, cruiseSpeed: 34 };
+test('touch lane changes retain subtle rear slip and scoring throughout the original 110 km/h range', () => {
+  const config = { ...standardDriving, maxSpeed: 110, cruiseSpeed: 34 };
   for (const speed of [10, 20, 110 / 3.6]) {
     const previous = initialState(),
       touch = initialState(),
@@ -133,7 +133,7 @@ test('touch lane changes have a subtle tail swing and settle after release at ev
 });
 
 test('a held touch gesture stays bounded and reversing it does not snap the tail', () => {
-  const config = { ...standardDriving, cruiseSpeed: 34 };
+  const config = { ...standardDriving, maxSpeed: 110, cruiseSpeed: 34 };
   const state = initialState();
   state.speed = 110 / 3.6;
   for (let i = 0; i < 480; i++) {
@@ -154,7 +154,7 @@ test('a held touch gesture stays bounded and reversing it does not snap the tail
 });
 
 test('touch follows the bend direction, not a road-center target', () => {
-  const config = { ...standardDriving, cruiseSpeed: 34 };
+  const config = { ...standardDriving, maxSpeed: 110, cruiseSpeed: 34 };
   for (const curvature of [-0.008, 0, 0.008]) {
     const state = initialState();
     state.speed = 25;
@@ -180,6 +180,30 @@ test('touch follows the bend direction, not a road-center target', () => {
   }
   assert.equal(touchDrivingSteer(1, initialState()), 0, 'no stationary rotation');
   assert.ok(Number.isFinite(touchDrivingSteer(NaN, { ...initialState(), speed: 20 }, NaN)));
+});
+
+test('280 km/h touch lane changes stay gentle and straighten after release at every frame rate', () => {
+  for (const fps of [30, 60, 120]) {
+    const state = { ...initialState(), speed: 280 / 3.6 };
+    let releaseOffset = 0;
+    for (let i = 0; i < fps * 3; i++) {
+      stepDriving(
+        state,
+        { steer: touchDrivingSteer(i < fps ? 1 : 0, state), accelerate: true, brake: false },
+        { ...standardDriving, cruiseSpeed: 36 },
+        1 / fps,
+        0,
+        1,
+        'challenge',
+      );
+      assert.ok(Math.abs(state.headingOffset!) < 0.05);
+      assert.ok(Math.abs(state.slide) < 0.2);
+      if (i === fps - 1) releaseOffset = state.offset;
+    }
+    assert.ok(Math.abs(state.headingOffset!) < 0.001);
+    assert.ok(state.offset - releaseOffset < 2, 'release does not send the rear across the road');
+    assert.equal(state.speed, 280 / 3.6);
+  }
 });
 
 test('touch heading recovery remains stable at 30, 60 and 120 Hz', () => {

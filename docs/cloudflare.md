@@ -124,7 +124,7 @@ server. Music files and their attribution are deployed with the other static ass
   browser still calculates the run. A determined modified client can fabricate
   plausible statistics. Server-side simulation/replay verification would be a
   separate feature before introducing prizes or competitive rewards.
-- Rules v3 raises the Standard top speed to 110 km/h. Older v1/v2 personal records
+- Rules v4 raises the Standard top speed to 280 km/h. Older v1/v2/v3 personal records
   and D1 rows remain untouched; current boards only rank matching rules.
 - `/api/preferences` uses Cloudflare's country metadata for automatic driving
   units. It needs no database and returns only a country code with `no-store`;

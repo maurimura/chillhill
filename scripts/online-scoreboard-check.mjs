@@ -82,6 +82,7 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
       // real game's unused dialog is closed/removed only inside this test page;
       // the harness is built from the production classes and actual styles.
       await page.evaluate(async () => {
+        const { scoringDefaults } = await import('/src/config/scoring.ts');
         const [
           { OnlineScoreboard },
           { ScoreboardView, resultsMarkup },
@@ -100,7 +101,7 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
           setItem: (key, value) => memory.set(key, value),
         });
         const record = (id, category = 'standard', index = 0) => ({
-          version: 3,
+          version: scoringDefaults.version,
           id,
           seed: 43112,
           car: 'astra',
@@ -176,7 +177,7 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
             if (harness.options.listOffline) throw new TypeError('Network unavailable');
             const category = new URL(url, location.origin).searchParams.get('category');
             return response({
-              version: 3,
+              version: scoringDefaults.version,
               category,
               entries: Array.from({ length: 10 }, (_, index) =>
                 harness.options.inline &&
@@ -399,6 +400,9 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
       );
       assert.match(await page.locator('#leaderboard-name-status').innerText(), /Please try again/);
       assert.equal(await page.locator('.is-pending-run').count(), 1);
+      // The failure message grows the row. Reveal it before clicking so the
+      // narrow viewport's focus-reveal scroll does not move Save mid-click.
+      await page.locator('.is-pending-run').scrollIntoViewIfNeeded();
       await page.locator('.leaderboard-name-row button').click();
       await page.waitForFunction(() => window.__onlineHarness.online.result.status === 'saved');
       await close();

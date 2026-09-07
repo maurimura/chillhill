@@ -1,6 +1,6 @@
 import { cars } from '../src/config/cars.ts';
 import { normalizeCountry } from '../src/config/units.ts';
-import { scoringDefaults, standardDriving } from '../src/config/scoring.ts';
+import { maxDrivingSpeed, scoringDefaults, standardDriving } from '../src/config/scoring.ts';
 import type { LeaderboardResponse, RankResponse } from '../src/leaderboard-api.ts';
 import { validScoreRecord, type ScoreCategory, type ScoreRecord } from '../src/scoreboard.ts';
 
@@ -231,7 +231,8 @@ function validateScore(value: unknown, session: Session, now: number): ScoreReco
     row.duration <= 0 ||
     row.duration > sessionLifetime / 1000 ||
     row.duration > (now - session.created_at) / 1000 + 15 ||
-    row.topSpeed > (row.category === 'standard' ? standardDriving.maxSpeed : 110) + 0.5 ||
+    row.topSpeed >
+      (row.category === 'standard' ? standardDriving.maxSpeed : maxDrivingSpeed) + 0.5 ||
     row.averageSpeed > row.topSpeed + 0.1 ||
     row.distance > (row.duration * row.topSpeed) / 3.6 + 5 ||
     row.shoulderSeconds > row.duration + 0.1 ||

@@ -16,6 +16,9 @@ export async function checkChallenge(browser, origin, errors) {
         weather: 'clear',
         roadWidth: 14,
         curves: 0.2,
+        // Preserve this scripted passing driver's original speed envelope.
+        // The 280 km/h cap has separate physics, touch and camera checks.
+        maxSpeed: 110,
         autoTime: false,
         autoWeather: false,
       }),
@@ -158,7 +161,10 @@ export async function checkChallenge(browser, origin, errors) {
     );
     assert.equal(await page.locator('#run-results').isVisible(), true);
     const savedRunCount = () =>
-      page.evaluate(() => JSON.parse(localStorage.getItem('chillhill.scores.v3')).records.length);
+      page.evaluate(async () => {
+        const { scoreStorageKey } = await import('/src/scoreboard.ts');
+        return JSON.parse(localStorage.getItem(scoreStorageKey)).records.length;
+      });
     assert.equal(await savedRunCount(), 1);
     assert.match(await page.locator('#resume').innerText(), /Try again/);
     await advance(10);

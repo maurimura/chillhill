@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initialState, roadOffsetLimit, stepDriving, type Input } from '../src/game/driving.ts';
 import { roadAt, random, terrainAt } from '../src/game/route.ts';
+import { maxDrivingSpeed } from '../src/config/scoring.ts';
 
 const config = { cruiseSpeed: 36, maxSpeed: 80, drift: 0.55, roadWidth: 10 };
 const neutral: Input = { steer: 0, accelerate: false, brake: false };
@@ -19,6 +20,49 @@ test('the car eases from rest to the configured coasting speed', () => {
 test('holding acceleration reaches but never exceeds the speed cap', () => {
   const state = simulate(30, { ...neutral, accelerate: true });
   assert.equal(state.speed, 80 / 3.6);
+});
+
+test('280 km/h is reachable in both modes at every frame rate, with unchanged coasting and full braking', () => {
+  const fastConfig = { ...config, maxSpeed: maxDrivingSpeed };
+  for (const mode of ['cozy', 'challenge'] as const)
+    for (const fps of [30, 60, 120]) {
+      const state = initialState();
+      for (let i = 0; i < fps * 25; i++) {
+        stepDriving(state, { ...neutral, accelerate: true }, fastConfig, 1 / fps, 0, 1, mode);
+        assert.ok(state.speed <= 280 / 3.6);
+      }
+      assert.equal(state.speed, 280 / 3.6);
+      for (let i = 0; i < fps * 50; i++)
+        stepDriving(state, neutral, fastConfig, 1 / fps, 0, 1, mode);
+      if (mode === 'cozy') assert.equal(state.speed * 3.6, 36);
+      else assert.ok(state.speed < 280 / 3.6);
+      state.speed = 280 / 3.6;
+      for (let i = 0; i < fps * 9; i++)
+        stepDriving(
+          state,
+          { steer: 1, accelerate: true, brake: true },
+          fastConfig,
+          1 / fps,
+          0,
+          1,
+          mode,
+        );
+      assert.equal(state.speed, 0);
+      const stopped = { ...state };
+      for (let i = 0; i < fps; i++)
+        stepDriving(
+          state,
+          { steer: 1, accelerate: false, brake: true },
+          fastConfig,
+          1 / fps,
+          0,
+          1,
+          mode,
+        );
+      assert.equal(state.distance, stopped.distance);
+      assert.equal(state.offset, stopped.offset);
+      assert.equal(state.slide, stopped.slide);
+    }
 });
 
 test('brake wins over acceleration and holds every position axis completely still', () => {

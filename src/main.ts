@@ -6,6 +6,7 @@ import '@fontsource/dm-serif-display/latin-400.css';
 import '@fontsource/dm-serif-display/latin-400-italic.css';
 import {
   defaults,
+  limits,
   loadSettings,
   normalizeSettings,
   saveSettings,
@@ -160,7 +161,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       .join('')}</fieldset>
     <fieldset><legend>SOFTEN THE EDGES</legend>${slider('roundness', 'Shape softness', 0, 1, 0.05)}<p class="field-note">From angular low poly to soft, rounded shapes. Changes the car, trees, rocks, mountains, and terrain in every atmosphere.</p></fieldset>
     <fieldset><legend>SHAPE THE HILLSIDE</legend>${slider('curves', 'Road curves', 0.2, 1.7, 0.05)}${slider('roadWidth', 'Road width', 7, 16, 0.5, ' m')}${slider('grade', 'Downhill slope', 0.03, 0.16, 0.01)}${slider('terrainHeight', 'Mountain height', 0.25, 2, 0.05)}${slider('treeDensity', 'Trees', 0, 2, 0.1)}${slider('fog', 'Misty distance', 0, 1, 0.05)}<div class="seed-row"><label for="seed">Landscape seed</label><input id="seed" type="number" data-setting="seed" min="1" max="99999" step="1"/><button class="icon-button" id="new-seed" aria-label="Generate another landscape" title="Another landscape">${icon('reset')}</button></div></fieldset>
-    <fieldset><legend>FIND YOUR FLOW</legend>${slider('cruiseSpeed', 'Coasting speed', 15, 55, 1, ' km/h')}${slider('maxSpeed', 'Top speed', 40, 110, 1, ' km/h')}${slider('drift', 'Slide & drift', 0, 1, 0.05)}${slider('smoke', 'Tire smoke', 0, 1, 0.05)}<p class="field-note">Steer into a smooth rear-end slide. Release or countersteer to let the tail settle; you keep rolling forward. The brake still holds you completely still.</p></fieldset>
+    <fieldset><legend>FIND YOUR FLOW</legend>${slider('cruiseSpeed', 'Coasting speed', 15, 55, 1, ' km/h')}${slider('maxSpeed', 'Top speed', limits.maxSpeed[0], limits.maxSpeed[1], 1, ' km/h')}${slider('drift', 'Slide & drift', 0, 1, 0.05)}${slider('smoke', 'Tire smoke', 0, 1, 0.05)}<p class="field-note">Steer into a smooth rear-end slide. Release or countersteer to let the tail settle; you keep rolling forward. The brake still holds you completely still.</p></fieldset>
     <fieldset><legend>KEEP IT SMOOTH</legend>${slider('pixelRatio', 'Render quality', 0.75, 2, 0.25)}<p class="field-note">Lower this for a smoother drive on smaller devices.</p></fieldset>
     <fieldset><legend>UNDER THE HOOD</legend><label class="debug-toggle" for="debug-hitboxes"><input type="checkbox" id="debug-hitboxes"/> Show collision hitboxes <kbd>H</kbd></label><p class="field-note">Live body outlines and road/recovery limits. Uses the same geometry as collision detection. Scenery and mirrors do not cause crashes. Debug view is off on refresh.</p></fieldset>
     <div class="panel-bottom"><button class="text-button" id="reset-settings">Restore defaults</button><button class="text-button" id="export-settings">Export settings ↗</button></div><p class="saved-note" id="saved-note" role="status">Changes are saved on this device.</p>

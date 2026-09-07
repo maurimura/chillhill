@@ -400,7 +400,14 @@ test('real near misses bank speed-weighted points only on clearance, not the lat
       terrainHeight: 1,
       seed: 42,
     };
-    const config = { ...challengeDefaults, trafficCount: 1, graceSeconds: 0 };
+    // Keep this capture-speed fixture at 40 km/h traffic even when the default
+    // cap changes: the 60 km/h player must be able to overtake it.
+    const config = {
+      ...challengeDefaults,
+      trafficCount: 1,
+      graceSeconds: 0,
+      trafficSpeedRatio: 40 / settings.maxSpeed,
+    };
     const driving = {
       ...initialState(),
       speed: 60 / 3.6,

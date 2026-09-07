@@ -7,7 +7,7 @@ test('both driving cameras gain distance with speed, and front view gains drift 
     for (const portrait of [false, true]) {
       const stopped = followDistance(front, true, portrait, 0, 0);
       const cruising = followDistance(front, true, portrait, 10, 0);
-      const fast = followDistance(front, true, portrait, 110 / 3.6, 0);
+      const fast = followDistance(front, true, portrait, 280 / 3.6, 0);
       assert.ok(stopped >= 12 && cruising > stopped && fast > cruising);
     }
   assert.ok(followDistance(true, true, false, 20, 0.78) > followDistance(true, true, false, 20, 0));

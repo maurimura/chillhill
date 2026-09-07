@@ -1,6 +1,9 @@
+/** Absolute configurable speed ceiling, in km/h; also enforced by the API. */
+export const maxDrivingSpeed = 280;
+
 /** Bump the rules version when changing ranked scoring or challenge physics. */
 export const scoringDefaults = Object.freeze({
-  version: 3,
+  version: 4,
   nearMissPoints: 100,
   speedReference: 60, // km/h; independent of display units or a custom speed cap
   speedMinMultiplier: 0.5,
@@ -30,7 +33,7 @@ export const standardDriving = Object.freeze({
   curves: 1,
   roadWidth: 10,
   grade: 0.09,
-  maxSpeed: 110,
+  maxSpeed: maxDrivingSpeed,
   drift: 0.55,
 });
 export type ScoredSettings = { [K in keyof typeof standardDriving]: number } & {

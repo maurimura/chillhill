@@ -14,7 +14,7 @@ export async function checkCameraFraming(page) {
     document.body.append(element);
     const settings = {
       ...defaults,
-      maxSpeed: 110,
+      maxSpeed: 280,
       drift: 1,
       grade: 0.16,
       curves: 1.7,
@@ -75,16 +75,16 @@ export async function checkCameraFraming(page) {
             };
             let previousRelative = scene.camera.position.clone().sub(root.position);
             let previousChunk = Math.floor(state.distance / 180);
-            for (let frame = 0; frame < fps * 20; frame++) {
+            for (let frame = 0; frame < fps * 31; frame++) {
               const time = frame / fps;
               const input = {
                 steer: time < 8 ? 0 : Math.sin((time - 8) * 1.9),
-                accelerate: time < 14,
-                brake: time >= 14,
+                accelerate: time < 22,
+                brake: time >= 22,
               };
               const road = roadAt(state.distance, settings);
               stepDriving(state, input, { ...settings, car }, 1 / fps, road.curvature, road.metric);
-              const front = time < 17 ? !(time >= 10 && time < 11) : Math.floor(time) % 2 === 0;
+              const front = time < 25 ? !(time >= 10 && time < 11) : Math.floor(time) % 2 === 0;
               scene.render(state, 1 / fps, true, input.brake, true, front);
               const relative = scene.camera.position.clone().sub(root.position);
               const chunk = Math.floor(state.distance / 180);
@@ -96,7 +96,8 @@ export async function checkCameraFraming(page) {
               previousRelative = relative;
               previousChunk = chunk;
               sample.maxSpeed = Math.max(sample.maxSpeed, state.speed);
-              if (time > 7 && time < 8) sample.fastGap = root.position.z - scene.camera.position.z;
+              if (time > 20 && time < 21)
+                sample.fastGap = root.position.z - scene.camera.position.z;
               for (const { mesh, point } of meshCorners) {
                 probe.copy(point).applyMatrix4(mesh.matrixWorld).project(scene.camera);
                 sample.maxX = Math.max(sample.maxX, Math.abs(probe.x));
@@ -140,7 +141,7 @@ export async function checkCameraFraming(page) {
       result.minZ > -1 && result.maxZ < 1,
       `no car parts may clip the depth planes: ${label}`,
     );
-    assert.ok(result.maxSpeed >= 110 / 3.6 - 0.001, `test must reach the speed cap: ${label}`);
+    assert.ok(result.maxSpeed >= 280 / 3.6 - 0.001, `test must reach the speed cap: ${label}`);
     assert.ok(
       result.fastGap > result.stoppedGap + 3,
       `speed must move the front camera farther away: ${label}`,
@@ -149,8 +150,8 @@ export async function checkCameraFraming(page) {
   }
   for (const [label, width, height, speed, slide] of [
     ['stopped', 760, 500, 0, 0],
-    ['fast-drift', 760, 500, 110 / 3.6, -0.78],
-    ['portrait-fast-drift', 390, 660, 110 / 3.6, 0.78],
+    ['fast-drift', 760, 500, 280 / 3.6, -0.78],
+    ['portrait-fast-drift', 390, 660, 280 / 3.6, 0.78],
   ]) {
     await page.evaluate(
       ({ width, height }) => {
@@ -174,6 +175,6 @@ export async function checkCameraFraming(page) {
     delete window.__cameraFramingCheck;
   });
   console.log(
-    `PASS: camera framing across ${results.reduce((total, result) => total + result.frames, 0)} moving frames, all cars, 30/60/120 Hz, portrait/landscape, acceleration to 110 km/h, drift, braking, camera changes and origin rebasing.`,
+    `PASS: camera framing across ${results.reduce((total, result) => total + result.frames, 0)} moving frames, all cars, 30/60/120 Hz, portrait/landscape, acceleration to 280 km/h, drift, braking, camera changes and origin rebasing.`,
   );
 }

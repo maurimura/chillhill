@@ -5,6 +5,7 @@ import { normalizeWorld, worldDefaults, type WorldSettings } from './config/worl
 import recipes from './config/scenes.json';
 import { readStored, storageKeys } from './config/storage';
 import { normalizeUnits, type UnitPreference } from './config/units';
+import { maxDrivingSpeed } from './config/scoring';
 
 export type StyleId = keyof typeof palettes;
 export type Palette = (typeof palettes)[StyleId];
@@ -40,7 +41,7 @@ export const limits = {
   roundness: [0, 1],
   fog: [0, 1],
   cruiseSpeed: [15, 55],
-  maxSpeed: [40, 110],
+  maxSpeed: [40, maxDrivingSpeed],
   drift: [0, 1],
   smoke: [0, 1],
   pixelRatio: [0.75, 2],
@@ -80,7 +81,7 @@ export const baseline: Settings = {
   roundness: 0.65,
   fog: 0.5,
   cruiseSpeed: 36,
-  maxSpeed: 110,
+  maxSpeed: maxDrivingSpeed,
   drift: 0.55,
   smoke: 0.65,
   pixelRatio: 1.75,
