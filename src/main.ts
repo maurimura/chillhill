@@ -122,7 +122,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <h1>Take the<br/><em>scenic route.</em></h1>
       <p id="intro-copy">A winding road. A little car. A moment for yourself.<br class="desktop-break"/> Let the hill do the work.</p>
       ${modePicker(true)}
-      <span class="start-note">or press <kbd>enter</kbd> for an easy drive</span>
+      <span class="start-note" id="start-note"><kbd>←</kbd> <kbd>→</kbd> choose your drive · <kbd>enter</kbd> to go</span>
     </section>
     <section class="pause-card" id="pause-card" role="dialog" aria-modal="false" aria-labelledby="pause-title" aria-describedby="pause-copy" tabindex="-1" hidden><div class="pause-summary"><span class="eyebrow" id="pause-kicker">THERE’S NO RUSH</span><h2 id="pause-title">Take a little breather.</h2><p id="pause-copy">The road will be right here.</p><div id="run-results" hidden></div>${modePicker()}<button class="text-button scoreboard-link" id="open-scoreboard" aria-haspopup="dialog" aria-controls="scoreboard-dialog" hidden>View scoreboard ↗</button></div><section id="run-leaderboard" aria-label="Leaderboard and worldwide name entry" hidden></section></section>
     <div class="challenge-hud" id="challenge-hud" hidden><span class="eyebrow">DRIFT KING</span><span class="score-category" id="score-category">Standard</span><button class="score-total" id="open-scoreboard-hud" aria-label="View score and scoreboard" aria-haspopup="dialog" aria-controls="scoreboard-dialog" title="View your scoreboard"><strong id="score">0</strong><span>pts ↗</span></button><span class="score-streak" id="score-streak" title="Multiplier for your next clean near miss">×1</span><div class="score-stats"><span><strong id="lives">3</strong> lives</span><span><strong id="overtakes">0</strong> near misses</span></div><div class="score-feedback" id="score-feedback" role="status" hidden></div></div>
@@ -463,6 +463,47 @@ document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach((button) =>
   }),
 );
 
+// Welcome choices stay native one-click actions. Focus previews a choice; only
+// activation changes the driving mode, so settings refreshes cannot reset it.
+const welcomeOptions = [...$('intro').querySelectorAll<HTMLButtonElement>('[data-mode]')];
+let welcomeChoice = welcomeOptions[0]!;
+$('intro').querySelector('.mode-picker')!.setAttribute('aria-describedby', 'start-note');
+function selectWelcome(button: HTMLButtonElement) {
+  welcomeChoice = button;
+  for (const option of welcomeOptions) option.dataset.selected = String(option === button);
+}
+selectWelcome(welcomeChoice);
+for (const button of welcomeOptions) {
+  button.addEventListener('focus', () => selectWelcome(button));
+  button.addEventListener('keydown', (event) => {
+    if (
+      started ||
+      inGarage ||
+      dialog.open ||
+      quickMenus.active ||
+      scoreboard.open ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      event.isComposing
+    )
+      return;
+    const direction = ['ArrowRight', 'ArrowDown'].includes(event.key)
+      ? 1
+      : ['ArrowLeft', 'ArrowUp'].includes(event.key)
+        ? -1
+        : 0;
+    if (!direction) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.repeat) return;
+    const next =
+      (welcomeOptions.indexOf(button) + direction + welcomeOptions.length) % welcomeOptions.length;
+    welcomeOptions[next]!.focus({ preventScroll: true });
+  });
+}
+
 $('pause').addEventListener('click', togglePause);
 $('restart').addEventListener('click', restart);
 for (const id of ['open-scoreboard', 'open-scoreboard-hud'])
@@ -571,7 +612,8 @@ window.addEventListener('keydown', (event) => {
     (!started || paused)
   ) {
     event.preventDefault();
-    start();
+    if (!started) welcomeChoice.click();
+    else start();
   }
   if (event.code === 'Escape' || event.code === 'KeyP') {
     event.preventDefault();
@@ -867,6 +909,8 @@ function syncLocation() {
     ensureDrivingScene();
   }
   syncPlayUI();
+  if (!started && !inGarage && scene && !dialog.open && !quickMenus.active && !scoreboard.open)
+    welcomeChoice.focus({ preventScroll: true });
 }
 window.addEventListener('hashchange', syncLocation);
 syncSettingsUI();

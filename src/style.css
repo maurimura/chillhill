@@ -1595,19 +1595,35 @@ body:not(.in-garage) .site-header :focus-visible,
   font-size: 10px;
   color: var(--overlay-muted);
 }
-.mode-option[data-current='true'] {
-  border-color: var(--overlay-accent);
-  background: #c7d6b71a;
-}
 .mode-option:hover {
   background: #c7d6b726;
 }
-.intro .mode-option[data-current='true'] {
+.intro .mode-option[data-selected='true'] {
+  border-color: var(--overlay-accent);
   background: var(--overlay-accent);
   color: #26372b;
+  box-shadow:
+    0 0 0 2px #c7d6b733,
+    0 0 16px #c7d6b726;
 }
-.intro .mode-option[data-current='true'] small {
+.intro .mode-option[data-selected='true'] small {
   color: inherit;
+}
+.intro .mode-option[data-selected='true']:focus {
+  animation: welcome-glow 2.8s ease-in-out infinite;
+}
+@keyframes welcome-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px #c7d6b733,
+      0 0 16px #c7d6b726;
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px #c7d6b766,
+      0 0 26px #c7d6b74d;
+  }
 }
 .pause-card .mode-picker {
   margin: 20px auto 0;
