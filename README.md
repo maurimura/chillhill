@@ -140,13 +140,17 @@ Speed, wandered distance, game-over distance, speed/road-width slider readouts a
 ## Sharing previews
 
 `index.html` contains static Open Graph and Twitter large-image tags, a canonical
-URL, image dimensions/alt text and a touch icon. Crawlers need no JavaScript or
-WebGL to discover them. `public/social/chillhill-coast-v1.png` is a 1200×630 render
-of the real coastal scene with the game's logo and typography; the standalone
-touch logo is 180×180. Run `npm run social:image` against local Vite to regenerate
+URL, image dimensions/alt text and PNG/SVG icons. The title and game description
+match across the page, Open Graph and Twitter. Crawlers need no JavaScript or
+WebGL to discover them. `public/social/chillhill-coast-v2.png` is a 1200×630 render
+of the real coastal scene with a prominent logo, game description and typography;
+the standalone touch logo is 180×180, with a 32×32 PNG favicon fallback.
+Run `npm run social:image` against local Vite to regenerate
 them, then rebuild. When changing the preview, version its filename and update
 the HTML URLs. `npm run test:sharing` checks the original HTML with JavaScript off
-and validates both public PNGs. Chat apps may retain previously cached previews.
+and validates all three public PNGs. Previous preview images stay available for
+cached links. Chat apps control the final layout and may retain old previews;
+[Slack caches crawler responses for roughly 30 minutes](https://api.slack.com/robots).
 
 ## The garage
 
