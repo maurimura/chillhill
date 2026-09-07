@@ -281,8 +281,6 @@
   outline-offset: 2px;
 }
 #scoreboard-category-note,
-.scoreboard-storage,
-.scoring-rules,
 #scoreboard-dialog .result-note {
   font-size: 11px;
   line-height: 1.6;
@@ -397,7 +395,7 @@
   cursor: pointer;
 }
 .online-run .text-button,
-#refresh-leaderboard {
+.scoreboard-empty .text-button {
   color: var(--overlay-accent);
   font-size: 12px;
 }
@@ -423,10 +421,6 @@
   text-align: center;
   font-size: 13px;
   line-height: 1.7;
-}
-.scoring-rules {
-  border-top: 1px solid var(--overlay-line);
-  padding-top: 14px;
 }
 @media (max-width: 650px), (pointer: coarse) {
   .challenge-hud {

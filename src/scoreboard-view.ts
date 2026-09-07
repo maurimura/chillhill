@@ -1,7 +1,7 @@
 import { cars } from './config/cars.ts';
 import { FocusScope } from './focus-scope.ts';
 import { formatDistance, formatLength, formatSpeed, type UnitSystem } from './config/units.ts';
-import { scoringDefaults, standardDriving } from './config/scoring.ts';
+import { standardDriving } from './config/scoring.ts';
 import type { OnlineScoreboard } from './online-scoreboard.ts';
 import {
   customReasonLabel,
@@ -57,10 +57,7 @@ export class ScoreboardView {
       <div class="scoreboard-body"><section id="scoreboard-result" aria-label="Last completed run" hidden></section>
       <section id="online-run" class="online-run" aria-label="Worldwide score entry" hidden></section>
       <div class="scoreboard-tabs" id="scoreboard-categories" role="group" aria-label="Score category"><button data-score-category="standard" aria-pressed="true">Standard</button><button data-score-category="custom" aria-pressed="false">Custom</button></div>
-      <p id="scoreboard-category-note"></p><ol id="scoreboard-list" aria-label="Top ten runs"></ol>
-      <p class="scoreboard-storage" id="scoreboard-storage"></p>
-      <button class="text-button" id="refresh-leaderboard">Refresh scores ↻</button>
-      <details class="scoring-rules"><summary>How points work</summary><p id="scoring-formula"></p><p id="scoring-drifts"></p><p id="scoring-penalties"></p><p>Only completed runs are recorded. Restarting or switching modes abandons the current run. Worldwide scores are community submissions with basic validation, not cheat-proof rankings.</p></details></div>`;
+      <p id="scoreboard-category-note"></p><ol id="scoreboard-list" aria-label="Top ten runs"></ol></div>`;
     this.dialog.append(this.content);
     document.body.append(this.dialog);
     this.focus = new FocusScope(
@@ -74,9 +71,19 @@ export class ScoreboardView {
       this.renderClaim();
       this.renderRows();
     });
-    this.content
-      .querySelector('#refresh-leaderboard')!
-      .addEventListener('click', () => void this.online.refresh(this.category), options);
+    this.content.querySelector('#scoreboard-list')!.addEventListener(
+      'click',
+      (event) => {
+        if (!(event.target as HTMLElement).closest('[data-leaderboard-retry]')) return;
+        void this.online.refresh(this.category);
+        // The failed-load button disappears while retrying. Keep keyboard focus
+        // in the leaderboard instead of dropping it onto the game's shortcuts.
+        this.content
+          .querySelector<HTMLElement>('#scoreboard-title')!
+          .focus({ preventScroll: true });
+      },
+      options,
+    );
     this.content.querySelector('#online-run')!.addEventListener(
       'input',
       (event) => {
@@ -208,12 +215,6 @@ export class ScoreboardView {
         ? `Default driving difficulty: ${formatSpeed(standardDriving.maxSpeed, this.units)} cap, ${formatLength(standardDriving.roadWidth, this.units)} road, standard curves, slope and drift. Any starting car and scenery. Changing driving settings, route, or cars mid-run makes it Custom.`
         : 'Custom setups and mid-run changes live here. Their difficulty varies, so these scores are kept separate from Standard.';
     this.renderRows();
-    get('scoring-drifts').textContent =
-      `On-road drifting earns ${scoringDefaults.driftPointsPerSecond} points per second, ramping to ${scoringDefaults.driftPointsPerSecond * scoringDefaults.driftMaxMultiplier} after ${scoringDefaults.driftRampSeconds} uninterrupted seconds. Straightening, stopping, touching a shoulder or crashing resets the drift multiplier. Turning smoke off does not affect points.`;
-    get('scoring-formula').textContent =
-      `Near miss = ${scoringDefaults.nearMissPoints} × speed multiplier × clean-streak multiplier. Speed multiplier is your speed ÷ ${formatSpeed(scoringDefaults.speedReference, this.units)}, limited to ${scoringDefaults.speedMinMultiplier}×–${scoringDefaults.speedMaxMultiplier}×. Speed is captured when the close pass first qualifies; points arrive only after you safely clear the car.`;
-    get('scoring-penalties').textContent =
-      `Clean streak: +${scoringDefaults.streakStep}× for each near miss, up to ${scoringDefaults.streakMaxMultiplier}×. There’s no combo timer. A shoulder departure costs ${scoringDefaults.shoulderEntryPenalty} points and resets the streak; staying outside drains ${scoringDefaults.shoulderMinRate}–${scoringDefaults.shoulderMaxRate} points per second. Scores never go below zero. Crashes cost a life and reset the streak.`;
   }
   private renderRows() {
     const get = (id: string) => this.content.querySelector<HTMLElement>(`#${id}`)!;
@@ -225,10 +226,8 @@ export class ScoreboardView {
               `<li class="scoreboard-row${row.id === this.result?.record.id ? ' is-current-run' : ''}"><span class="scoreboard-rank">${index + 1}</span><div class="scoreboard-ride"><strong>${escape(name || ride(row))}</strong><span>${name ? `${escape(ride(row))} · ` : ''}${escape(row.nearMisses)} near misses · ${escape(formatDistance(row.distance, this.units))}</span><time datetime="${escape(row.finishedAt)}">${escape(new Date(row.finishedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }))}</time><details><summary>Run details</summary><p>${escape(`Top ${formatSpeed(row.topSpeed, this.units)} · average ${formatSpeed(row.averageSpeed, this.units)} while moving. ${row.shoulderTouches} shoulder touches · ${row.shoulderSeconds.toFixed(1)}s outside. Best streak ${row.bestStreak}. Drift points ${formatScore(row.driftEarned)} · best drift ${row.bestDriftSeconds.toFixed(1)}s. Starting seed ${row.seed}.`)}</p>${row.customReasons.length ? `<p>${escape(row.customReasons.map(customReasonLabel).join(' · '))}</p>` : ''}</details></div><strong class="scoreboard-points">${escape(formatScore(row.score))}<small>pts</small></strong></li>`,
           )
           .join('')
-      : `<li class="scoreboard-empty">${this.online.loading ? 'Looking down the road…' : this.online.error ? escape(this.online.error) : 'No finished runs here yet.<br/>Your next road could be the first.'}</li>`;
+      : `<li class="scoreboard-empty">${this.online.loading ? 'Looking down the road…' : this.online.error ? `${escape(this.online.error)}<br/><button class="text-button" data-leaderboard-retry>Try again ↻</button>` : 'No finished runs here yet.<br/>Your next road could be the first.'}</li>`;
     if (get('scoreboard-list').innerHTML !== markup) get('scoreboard-list').innerHTML = markup;
-    (get('refresh-leaderboard') as HTMLButtonElement).disabled = this.online.loading;
-    get('scoreboard-storage').textContent = `Community scores · rules v${scoringDefaults.version}`;
   }
   private renderClaim() {
     const element = this.content.querySelector<HTMLElement>('#online-run')!;

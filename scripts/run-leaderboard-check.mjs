@@ -141,6 +141,10 @@ try {
       assert.equal(await page.locator('[data-score-source]').count(), 0);
       assert.equal(await page.locator('#scoreboard-categories').isVisible(), false);
       assert.equal(await page.locator('#run-leaderboard .scoreboard-row').count(), 10);
+      assert.equal(
+        await page.locator('#scoreboard-storage, #refresh-leaderboard, .scoring-rules').count(),
+        0,
+      );
       assert.doesNotMatch(
         await page.locator('#pause-card').innerText(),
         /On this device|personal board|Saved in this browser/i,

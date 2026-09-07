@@ -17,7 +17,7 @@ const textSelectors = [
   '.scoreboard-ride > strong',
   '.scoreboard-ride > span',
   '.scoreboard-points',
-  '#scoreboard-storage',
+  '.scoreboard-empty .text-button',
 ];
 
 export async function checkOnlineScoreboard(browser, origin, errors = []) {
@@ -241,6 +241,11 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
       });
 
       await begin({ holdFinish: true, holdName: true });
+      assert.equal(
+        await page.locator('#scoreboard-storage, #refresh-leaderboard, .scoring-rules').count(),
+        0,
+        'no extra leaderboard footer',
+      );
       assert.match(await page.locator('#online-run').innerText(), /Checking your place/);
       assert.equal(
         await page.locator('#leaderboard-name').count(),
@@ -268,7 +273,7 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
         'opening a qualified result focuses name entry',
       );
       await page.locator('#leaderboard-name').fill('Astra pal');
-      await page.locator('#refresh-leaderboard').click();
+      await page.evaluate(() => window.__onlineHarness.online.refresh('standard'));
       await page.waitForFunction(() => !window.__onlineHarness.online.loading);
       assert.equal(await page.locator('#leaderboard-name').inputValue(), 'Astra pal');
       await page.locator('#leaderboard-name').focus();
@@ -386,11 +391,32 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
       assert.match(await page.locator('#scoreboard-list').innerText(), /Network unavailable/);
       await bounds();
       await page.screenshot({ path: `artifacts/online-scoreboard-offline-${viewport.width}.png` });
+      assert.equal(await page.locator('[data-leaderboard-retry]').isVisible(), true);
+      await page.evaluate(() => {
+        window.__onlineHarness.options.listOffline = false;
+      });
+      await page.locator('[data-leaderboard-retry]').click();
+      await page.waitForFunction(() => !window.__onlineHarness.online.loading);
+      assert.equal(await page.locator('.scoreboard-row').count(), 10);
+      assert.equal(
+        await page.locator('[data-leaderboard-retry]').count(),
+        0,
+        'retry only appears on a failed load',
+      );
+      assert.equal(await page.evaluate(() => document.activeElement?.id), 'scoreboard-title');
       await close();
 
       // The finished-run panel uses the very same live view, without opening a
       // second modal or clicking a publish link. All API requests stay mocked.
       await begin({ inline: true, holdFinish: true, holdName: true, category: 'custom' });
+      assert.equal(
+        await page
+          .locator(
+            '#run-leaderboard #scoreboard-storage, #run-leaderboard #refresh-leaderboard, #run-leaderboard .scoring-rules',
+          )
+          .count(),
+        0,
+      );
       assert.equal(await page.locator('#run-leaderboard').isVisible(), true);
       assert.equal(await page.locator('#scoreboard-dialog').isVisible(), false);
       await page.waitForFunction(() => !window.__onlineHarness.online.loading);
@@ -409,7 +435,7 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
         return input.dataset.identity;
       });
       await page.keyboard.type('Coastal pal');
-      await page.locator('#refresh-leaderboard').click();
+      await page.evaluate(() => window.__onlineHarness.online.refresh('custom'));
       await page.waitForFunction(() => !window.__onlineHarness.online.loading);
       assert.equal(await page.locator('#leaderboard-name').inputValue(), 'Coastal pal');
       assert.equal(
