@@ -201,8 +201,11 @@ const pauseFocus = new FocusScope(
   () =>
     !$('pause-card').hidden && !inGarage && !dialog.open && !quickMenus.active && !scoreboard.open,
   () =>
-    document.querySelector('#pause-card #leaderboard-name:not([readonly])') ??
-    document.querySelector('#pause-card #resume'),
+    document.querySelector(
+      matchMedia('(pointer: coarse)').matches
+        ? '#pause-card .is-pending-run'
+        : '#pause-card #leaderboard-name:not([readonly])',
+    ) ?? document.querySelector('#pause-card #resume'),
 );
 let frameId = 0;
 let rebuildTimer = 0;
@@ -386,7 +389,11 @@ function syncModeUI() {
     gameover && !!runResult && onlineScores.enabled,
   );
   if (gameover && runResult) {
-    $('run-results').innerHTML = resultsMarkup(runResult, unitSystem);
+    const detailsOpen =
+      $('run-results').querySelector<HTMLDetailsElement>('.result-details')?.open ??
+      !matchMedia('(max-width: 760px), (pointer: coarse)').matches;
+    $('run-results').innerHTML = resultsMarkup(runResult, unitSystem, true);
+    $('run-results').querySelector<HTMLDetailsElement>('.result-details')!.open = detailsOpen;
     if (onlineScores.enabled) scoreboard.embed($('run-leaderboard'), runResult, unitSystem);
   } else scoreboard.clearEmbedded();
 }
@@ -539,7 +546,7 @@ window.addEventListener('keydown', (event) => {
       (event.target.closest(
         '#run-leaderboard, input, select, textarea, [contenteditable]:not([contenteditable="false"])',
       ) ||
-        (enter && event.target.closest('button, a, [role="button"]'))))
+        (enter && event.target.closest('button, a, summary, [role="button"]'))))
   )
     return;
   if (event.repeat) return;

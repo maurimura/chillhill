@@ -11,11 +11,20 @@ await mkdir('artifacts', { recursive: true });
 try {
   for (const viewport of [
     { width: 1440, height: 900 },
-    { width: 390, height: 844 },
-    { width: 320, height: 640 },
-    { width: 844, height: 390 },
+    { width: 390, height: 700 },
+    { width: 320, height: 568 },
+    { width: 844, height: 300 },
+    { width: 568, height: 260 },
   ]) {
-    const page = await browser.newPage({ viewport, locale: 'es-AR' });
+    const mobile = viewport.width !== 1440;
+    const rank =
+      viewport.width === 390 ? 1 : viewport.width === 320 || viewport.width === 568 ? 10 : 5;
+    const page = await browser.newPage({
+      viewport,
+      locale: 'es-AR',
+      hasTouch: mobile,
+      isMobile: mobile,
+    });
     const errors = [];
     page.on('pageerror', (error) => errors.push(error.message));
     let finished,
@@ -59,13 +68,13 @@ try {
         });
       if (url.pathname.endsWith('/finish')) {
         finished = route.request().postDataJSON().record;
-        return route.fulfill({ json: { qualified: true, rank: 2 } });
+        return route.fulfill({ json: { qualified: true, rank } });
       }
       if (url.pathname.endsWith('/name')) {
         nameCalls++;
         postedName = route.request().postDataJSON().name;
         await saving;
-        return route.fulfill({ json: { qualified: true, rank: 2 } });
+        return route.fulfill({ json: { qualified: true, rank } });
       }
       if (url.pathname === '/api/leaderboard') {
         const category = url.searchParams.get('category');
@@ -74,7 +83,7 @@ try {
             version: 3,
             category,
             entries: Array.from({ length: 10 }, (_, i) =>
-              postedName && i === 1
+              postedName && i === rank - 1
                 ? { name: postedName, record: finished }
                 : {
                     name: `Road friend ${i + 1}`,
@@ -133,14 +142,53 @@ try {
       }
       await page.waitForSelector('#pause-card.has-leaderboard');
       await page.waitForFunction(
-        () => document.activeElement?.id === 'leaderboard-name',
-        undefined,
+        (mobile) =>
+          mobile
+            ? document.activeElement?.classList.contains('is-pending-run')
+            : document.activeElement?.id === 'leaderboard-name',
+        mobile,
         { polling: 50 },
       );
       assert.equal(await page.locator('#scoreboard-dialog').isVisible(), false);
       assert.equal(await page.locator('[data-score-source]').count(), 0);
       assert.equal(await page.locator('#scoreboard-categories').isVisible(), false);
       assert.equal(await page.locator('#run-leaderboard .scoreboard-row').count(), 10);
+      assert.deepEqual(
+        await page.locator('#scoreboard-list .scoreboard-rank').allTextContents(),
+        Array.from({ length: 10 }, (_, index) => String(index + 1)),
+      );
+      assert.equal(await page.locator('#online-run form').count(), 0, 'no separate entry card');
+      assert.equal(
+        await page
+          .locator('#scoreboard-list > li')
+          .nth(rank - 1)
+          .locator('#leaderboard-name')
+          .count(),
+        1,
+      );
+      assert.equal(
+        await page.locator('.is-pending-run .scoreboard-rank').innerText(),
+        String(rank),
+      );
+      const visibleEntry = async () =>
+        page.locator('#scoreboard-list').evaluate((list) => {
+          const board = list.getBoundingClientRect();
+          const card = document.getElementById('pause-card').getBoundingClientRect();
+          const input = document.getElementById('leaderboard-name').getBoundingClientRect();
+          const button = list.querySelector('button[type="submit"]').getBoundingClientRect();
+          return [input, button].every(
+            (rect) =>
+              rect.top >= board.top - 1 &&
+              rect.bottom <= board.bottom + 1 &&
+              rect.left >= card.left &&
+              rect.right <= card.right,
+          );
+        });
+      assert.equal(
+        await visibleEntry(),
+        true,
+        `rank ${rank} input and Save fit without scrolling the whole dialog`,
+      );
       assert.equal(
         await page.locator('#scoreboard-storage, #refresh-leaderboard, .scoring-rules').count(),
         0,
@@ -149,13 +197,14 @@ try {
         await page.locator('#pause-card').innerText(),
         /On this device|personal board|Saved in this browser/i,
       );
-      await page.keyboard.type('Coastal friend');
+      await page.locator('#leaderboard-name').fill('Coastal friend');
       // Same mounted draft survives a trip to settings and a display-only change.
       await page.locator('#open-settings').click();
       await page.locator('#units').selectOption('imperial');
       await page.locator('#close-settings').click();
+      await page.waitForSelector('#pause-card.has-leaderboard', { state: 'visible' });
       assert.equal(await page.locator('#leaderboard-name').inputValue(), 'Coastal friend');
-      assert.match(await page.locator('#run-results').innerText(), /mi/);
+      assert.match(await page.locator('#run-results').textContent(), /mi/);
       await page.locator('#leaderboard-name').focus();
       const layout = await page.locator('#pause-card').evaluate((card) => {
         const a = card.getBoundingClientRect(),
@@ -171,8 +220,77 @@ try {
       });
       assert.equal(layout.fits, true, JSON.stringify({ viewport, layout }));
       assert.equal(layout.overflow, false);
-      assert.equal(viewport.width > 760 ? layout.columns : layout.stacked, true);
+      assert.equal(
+        viewport.width > 760 || viewport.width > viewport.height ? layout.columns : layout.stacked,
+        true,
+      );
+      assert.equal(
+        await page
+          .locator('#pause-card')
+          .evaluate((card) => card.scrollHeight <= card.clientHeight + 1),
+        true,
+        'the sheet itself does not crop or scroll',
+      );
+      if (mobile) {
+        assert.equal(await page.locator('.touch-controls').isVisible(), false);
+        assert.equal(
+          await page.locator('.pause-summary').evaluate((summary) => {
+            const box = summary.getBoundingClientRect();
+            return [...summary.querySelectorAll('[data-mode]')].every((button) => {
+              const rect = button.getBoundingClientRect();
+              return (
+                rect.bottom <= box.bottom + 1 &&
+                rect.left >= box.left &&
+                rect.right <= box.right + 1 &&
+                button.scrollWidth <= button.clientWidth + 1
+              );
+            });
+          }),
+          true,
+          'both replay buttons fit without a cropped bottom edge',
+        );
+        await page.locator('.result-details > summary').focus();
+        await page.keyboard.press('Enter');
+        assert.equal(
+          await page.locator('#pause-card').isVisible(),
+          true,
+          'Enter on run details does not restart',
+        );
+        await page.waitForFunction(
+          () => {
+            const list = document.getElementById('scoreboard-list').getBoundingClientRect();
+            const field = document.getElementById('leaderboard-name').getBoundingClientRect();
+            return field.bottom <= list.bottom + 1 && field.top >= list.top - 1;
+          },
+          undefined,
+          { polling: 50 },
+        );
+        assert.equal(await visibleEntry(), true, 'expanded details leave the board accessible');
+        await page.locator('.result-details > summary').click();
+      }
       await page.screenshot({ path: `artifacts/production-run-leaderboard-${viewport.width}.png` });
+      if (viewport.width === 390 || viewport.width === 320) {
+        await page.evaluate(() => {
+          Object.defineProperty(visualViewport, 'height', { configurable: true, value: 330 });
+          visualViewport.dispatchEvent(new Event('resize'));
+        });
+        assert.equal(
+          await page.locator('.pause-summary').isVisible(),
+          false,
+          'keyboard leaves room for the editable board',
+        );
+        assert.equal(await visibleEntry(), true);
+        assert.ok(
+          await page
+            .locator('#pause-card')
+            .evaluate((el) => el.getBoundingClientRect().bottom <= 330),
+        );
+        await page.evaluate(() => {
+          delete visualViewport.height;
+          visualViewport.dispatchEvent(new Event('resize'));
+        });
+      }
+      await page.locator('#leaderboard-name').focus();
       await page.keyboard.press('Enter');
       await page.waitForFunction(
         () => document.querySelector('#leaderboard-name')?.readOnly,
@@ -217,7 +335,7 @@ try {
     }
   }
   console.log(
-    'PASS: production game-over automatically shows worldwide top ten and name entry; no local/source UI; draft/unit preservation, safe Enter submission, updated rank, replay and four responsive viewports.',
+    'PASS: ranked inline name entry at #1/#5/#10, five desktop/mobile/short-landscape viewports, keyboard-sized viewport, expandable details, preserved drafts, safe Enter saving, updated rank and replay. All APIs mocked locally.',
   );
 } finally {
   await browser.close();

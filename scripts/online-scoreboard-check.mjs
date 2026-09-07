@@ -158,6 +158,13 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
             return response(result);
           }
           if (url.endsWith('/name')) {
+            if (harness.options.nameError) {
+              harness.options.nameError = false;
+              return new Response(JSON.stringify({ error: 'Could not save. Please try again.' }), {
+                status: 503,
+                headers: { 'Content-Type': 'application/json' },
+              });
+            }
             const result = harness.options.name ?? { qualified: true, rank: 3 };
             if (harness.options.holdName)
               return new Promise((resolve) => {
@@ -229,7 +236,7 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
               '8 near misses · 1.61 km driven. Try again, or take an Easy drive.';
             const summary = document.querySelector('#run-results');
             summary.hidden = false;
-            summary.innerHTML = resultsMarkup(result, 'metric');
+            summary.innerHTML = resultsMarkup(result, 'metric', true);
             document.querySelector('#open-scoreboard').hidden = true;
             host.hidden = false;
             view.embed(host, result, 'metric');
@@ -376,13 +383,33 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
       assert.equal(await page.evaluate(() => window.__onlineHarness.store.records.length), 3);
       await close();
 
+      await begin({ nameError: true });
+      await page.locator('#leaderboard-name').fill('Patient driver');
+      await page.locator('#leaderboard-name').evaluate((input) => {
+        input.dataset.identity = 'retry-draft';
+      });
+      await page.locator('.leaderboard-name-row button').click();
+      await page.waitForFunction(() =>
+        window.__onlineHarness.online.result.message.includes('Could not save'),
+      );
+      assert.equal(await page.locator('#leaderboard-name').inputValue(), 'Patient driver');
+      assert.equal(
+        await page.locator('#leaderboard-name').getAttribute('data-identity'),
+        'retry-draft',
+      );
+      assert.match(await page.locator('#leaderboard-name-status').innerText(), /Please try again/);
+      assert.equal(await page.locator('.is-pending-run').count(), 1);
+      await page.locator('.leaderboard-name-row button').click();
+      await page.waitForFunction(() => window.__onlineHarness.online.result.status === 'saved');
+      await close();
+
       await begin({ startOffline: true, listOffline: true });
       assert.equal(await page.locator('#leaderboard-name').count(), 0);
       assert.match(
         await page.locator('#online-run').innerText(),
         /started offline.*saved locally/s,
       );
-      assert.equal(await page.evaluate(() => window.__onlineHarness.store.records.length), 4);
+      assert.equal(await page.evaluate(() => window.__onlineHarness.store.records.length), 5);
       assert.equal(
         await page.locator('.scoreboard-row').count(),
         0,
