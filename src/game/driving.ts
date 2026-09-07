@@ -11,6 +11,8 @@ export interface Input {
   steer: number;
   accelerate: boolean;
   brake: boolean;
+  /** Touch intent is a gentle sideways movement, resolved before the physics. */
+  touch?: boolean;
 }
 export interface DrivingState {
   distance: number;
@@ -41,6 +43,10 @@ const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(mi
 
 export const FRONT_AXLE = carAxles(cars[defaultCar]).front;
 export const roadOffsetLimit = carRoadLimit;
+
+/** Full-lock turn authority, shared with the touch steering controller. */
+export const challengeSteeringAuthority = (speed: number) =>
+  (0.62 * Math.min(speed / 7, 1)) / (1 + speed * 0.018);
 
 /** Speeds are m/s internally and km/h in configuration. Brake always wins. */
 export function stepDriving(
@@ -78,7 +84,7 @@ export function stepDriving(
     // Steering turns the actual direction of travel. A bend beneath the car
     // changes only the *relative* heading: it cannot turn an unattended car.
     // The mellow steering rate and familiar rear-slip spring stay forgiving.
-    const turnRate = (state.steering * 0.62 * movement) / (1 + state.speed * 0.018);
+    const turnRate = state.steering * challengeSteeringAuthority(state.speed);
     const relative = heading + (turnRate - curvature * state.speed * Math.cos(heading)) * dt;
     state.headingOffset = Math.atan2(Math.sin(relative), Math.cos(relative));
   }

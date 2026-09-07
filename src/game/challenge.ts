@@ -8,6 +8,7 @@ import {
   type Input,
 } from './driving.ts';
 import { random, roadAt, type RouteSettings } from './route.ts';
+import { touchDrivingSteer } from './touch-input.ts';
 import { roadDeparture, sweptTrafficEncounter } from './collision.ts';
 import {
   awardNearMiss,
@@ -315,7 +316,10 @@ export function stepChallenge(
   const before = { ...driving };
   const wasOffRoad = challenge.offRoad.active;
   const road = roadAt(driving.distance, settings);
-  stepDriving(driving, input, settings, dt, road.curvature, road.metric, 'challenge');
+  const command = input.touch
+    ? { ...input, steer: touchDrivingSteer(input.steer, driving, road.curvature) }
+    : input;
+  stepDriving(driving, command, settings, dt, road.curvature, road.metric, 'challenge');
   const wasProtected = challenge.graceRemaining > 0;
   challenge.graceRemaining = Math.max(0, challenge.graceRemaining - dt);
   const departure = roadDeparture(driving, settings.car ?? defaultCar, settings);

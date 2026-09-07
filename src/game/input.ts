@@ -4,6 +4,9 @@ import { touchPedals, touchSteering } from './touch-input';
 export class Controls {
   private enabled = false;
   private keys = new Set<string>();
+  // Retain the touch scheme after lift/cancel so its heading can settle. A
+  // driving key immediately restores direct keyboard steering, even on a tablet.
+  private touchScheme = false;
   private thumb:
     | {
         pointer: number;
@@ -53,6 +56,10 @@ export class Controls {
           ].includes(event.code)
         ) {
           event.preventDefault();
+          if (event.code !== 'KeyV') {
+            this.touchScheme = false;
+            this.releaseThumb();
+          }
           this.keys.add(event.code);
         }
       },
@@ -99,6 +106,7 @@ export class Controls {
         const onPad = pad.contains(event.target);
         if (!onPad && !['touch', 'pen'].includes(event.pointerType)) return;
         event.preventDefault();
+        this.touchScheme = true;
         const rect = pad.getBoundingClientRect();
         // Keep the optional fixed pad's familiar coordinates. Everywhere else,
         // the initial contact is neutral, with travel measured in CSS pixels
@@ -147,6 +155,7 @@ export class Controls {
     const right = this.keys.has('KeyD') || this.keys.has('ArrowRight');
     return {
       frontView: this.keys.has('KeyV'),
+      touch: this.touchScheme,
       steer: this.thumb
         ? touchSteering(this.thumb.steer, mode, speed)
         : Number(right) - Number(left),

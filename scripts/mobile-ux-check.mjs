@@ -188,8 +188,8 @@ export async function checkMobileUX(browser, origin, errors = []) {
       await touch('touchMove', 0.99, 0.2);
       const full = await advance(0.5);
       assert.ok(
-        full.steering > 0.85,
-        `the pad edge retains full turning authority: ${JSON.stringify({ viewport, full })}`,
+        full.headingOffset > correction.headingOffset + 0.02 && full.headingOffset < 0.22,
+        `the pad edge asks for a useful, bounded lane change: ${JSON.stringify({ viewport, full })}`,
       );
       await touch('touchMove', 0.5, 0.9);
       assert.equal((await advance(1.5)).speed, 0, 'braking still stops completely');
@@ -246,11 +246,19 @@ export async function checkMobileUX(browser, origin, errors = []) {
         assert.equal((await advance(0.2)).speed, 0, 'contact alone never accelerates');
         await finger('touchMove', x + 20, y - 30, 20, -30);
         const right = await advance(0.5);
-        assert.ok(right.speed > 1 && right.steering > 0.02 && right.steering < 0.4);
+        assert.ok(
+          right.speed > 1 && right.headingOffset > 0.005 && right.headingOffset < 0.08,
+          `a small right drag makes a shallow lane change: ${JSON.stringify(right)}`,
+        );
         await finger('touchMove', x - 20, y - 30, -20, -30);
         assert.ok(
-          (await advance(0.5)).steering < -0.02,
+          (await advance(0.5)).headingOffset < -0.005,
           'relative left steering works from either side',
+        );
+        await finger('touchMove', x, y - 30, 0, -30);
+        assert.ok(
+          Math.abs((await advance(0.75)).headingOffset) < 0.01,
+          'centering the gesture settles the heading while throttle remains held',
         );
         await finger('touchMove', x, y + 35, 0, 35);
         assert.equal((await advance(1)).speed, 0, 'screen drag can fully stop');
@@ -360,7 +368,7 @@ export async function checkMobileUX(browser, origin, errors = []) {
   }
   assert.deepEqual(errors, []);
   console.log(
-    'PASS: anywhere-on-screen neutral-origin steering, combined pedals, capture/cancel/rotation/pause/menu safety, optional fixed pad, compact HUD, readable edge warnings and five mobile/tablet viewports.',
+    'PASS: shallow touch lane changes, centered-heading recovery, direct keyboard takeover, anywhere-on-screen gestures, combined pedals, capture/cancel/rotation/pause/menu safety and five mobile/tablet viewports.',
   );
 }
 
