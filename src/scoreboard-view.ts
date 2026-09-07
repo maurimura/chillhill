@@ -42,6 +42,7 @@ export class ScoreboardView {
   private focus: FocusScope;
   private alias = '';
   private pendingRow: HTMLLIElement | null = null;
+  private revealedSaved = '';
   private resize: ResizeObserver;
   private unsubscribe: () => void;
 
@@ -225,17 +226,17 @@ export class ScoreboardView {
     this.units = units;
     if (this.open || this.embeddedHost) this.render();
   }
-  private revealEntry() {
-    if (!this.pendingRow?.isConnected || !this.pendingRow.checkVisibility()) return;
+  private revealEntry(entry: HTMLElement | null = this.pendingRow) {
+    if (!entry?.isConnected || !entry.checkVisibility()) return;
     const scroller = this.content.querySelector<HTMLElement>(
       this.embeddedHost && !this.open ? '#scoreboard-list' : '.scoreboard-body',
     )!;
     const area = scroller.getBoundingClientRect();
-    const fullRow = this.pendingRow.getBoundingClientRect();
+    const fullRow = entry.getBoundingClientRect();
     const row =
       fullRow.height <= area.height
         ? fullRow
-        : this.pendingRow.querySelector('.leaderboard-name-row')!.getBoundingClientRect();
+        : (entry.querySelector('.leaderboard-name-row') ?? entry).getBoundingClientRect();
     if (row.bottom > area.bottom) scroller.scrollTop += row.bottom - area.bottom + 2;
     if (row.top < area.top) scroller.scrollTop -= area.top - row.top + 2;
   }
@@ -343,6 +344,11 @@ export class ScoreboardView {
       get('scoreboard-title').focus({ preventScroll: true });
     }
     if (pending && this.pendingRow?.contains(document.activeElement)) this.revealEntry();
+    const saved = nodes.find((node) => node.classList.contains('is-current-run'));
+    if (claim?.status === 'saved' && saved && this.revealedSaved !== claim.recordId) {
+      this.revealedSaved = claim.recordId;
+      this.revealEntry(saved);
+    }
   }
   private renderClaim() {
     const element = this.content.querySelector<HTMLElement>('#online-run')!;

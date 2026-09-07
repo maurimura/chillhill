@@ -152,6 +152,11 @@ try {
       assert.equal(await page.locator('#scoreboard-dialog').isVisible(), false);
       assert.equal(await page.locator('[data-score-source]').count(), 0);
       assert.equal(await page.locator('#scoreboard-categories').isVisible(), false);
+      await page.waitForFunction(
+        () => document.querySelectorAll('#run-leaderboard .scoreboard-row').length === 10,
+        undefined,
+        { polling: 50 },
+      );
       assert.equal(await page.locator('#run-leaderboard .scoreboard-row').count(), 10);
       assert.deepEqual(
         await page.locator('#scoreboard-list .scoreboard-rank').allTextContents(),
@@ -311,6 +316,15 @@ try {
       assert.match(
         await page.locator('#scoreboard-list .is-current-run').innerText(),
         /Coastal friend/,
+      );
+      assert.equal(
+        await page.locator('#scoreboard-list .is-current-run').evaluate((row) => {
+          const box = row.getBoundingClientRect(),
+            list = row.parentElement.getBoundingClientRect();
+          return box.top >= list.top - 1 && box.bottom <= list.bottom + 1;
+        }),
+        true,
+        'the saved name remains visible in its ranked row',
       );
       await page.keyboard.press('Enter');
       assert.equal(await page.locator('#pause-card').isVisible(), true, 'submit does not replay');
