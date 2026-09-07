@@ -135,7 +135,8 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <div class="route-card"><div class="route-drawing"><svg viewBox="0 0 72 76" aria-label="The next stretch of road"><path d="M36 68L36 8" fill="none" stroke="currentColor" stroke-opacity=".25" stroke-width="3" stroke-linecap="round"/><circle id="route-dot" cx="36" cy="68" r="4" fill="currentColor"/></svg></div><div><span class="eyebrow">THE ROAD AHEAD</span><span class="route-distance"><span id="distance">0.00</span> <small id="distance-unit">km wandered</small></span><span class="route-note" id="route-note">Just you and the hillside.</span><span class="world-clock-label" id="world-clock-label"></span></div></div>
       <div class="speed-card"><span class="speed-number" id="speed">00</span><div><span class="speed-unit" id="speed-unit">KM/H</span><span class="speed-status" id="speed-status">NICE & EASY</span></div><div class="speed-track"><span id="speed-fill"></span></div></div>
     </div>
-    <div class="touch-controls"><span class="thumb-hint">ONE THUMB. ALL YOU NEED.</span><div id="thumb-pad" role="group" aria-label="Touch driving pad: slide left or right to steer, up to accelerate, and hold down to brake"><span class="pad-up">GO ↑</span><span class="pad-left">←</span><span class="pad-right">→</span><span class="pad-down">BRAKE ↓</span><span class="pad-puck"></span></div></div>
+    <div id="touch-gesture" hidden aria-hidden="true"><span></span></div>
+    <div class="touch-controls"><span class="thumb-hint">ONE THUMB. ALL YOU NEED.</span><div id="thumb-pad" role="group" aria-label="Drag anywhere on the game to drive, or use this pad: left or right to steer, up to accelerate, and hold down to brake"><span class="pad-up">GO ↑</span><span class="pad-left">←</span><span class="pad-right">→</span><span class="pad-down">BRAKE ↓</span><span class="pad-anywhere">DRAG<br>ANYWHERE</span><span class="pad-puck"></span></div></div>
     <aside class="driving-guide" aria-label="Driving controls"><div class="keyboard-guide"><span><kbd>A</kbd><kbd>D</kbd> steer</span><span><kbd>W</kbd> <span id="throttle-guide">a little faster</span></span><span><kbd>S</kbd> slow down & stop</span><span><kbd>V</kbd> hold for front view</span><span class="arrows-note">arrow keys work, too</span></div></aside>
     <div class="canvas-error" id="canvas-error" hidden><h2>The view couldn’t load.</h2><p>This game needs a browser with WebGL 2 and graphics acceleration enabled. Try an updated Chrome, Safari, or Firefox.</p><button class="start-button" id="reload">Try again</button></div>
   </main>
@@ -393,7 +394,9 @@ function syncModeUI() {
 function syncPlayUI() {
   syncModeUI();
   carMenu.setOpen(quickMenus.current === 'car-menu');
-  controls.setEnabled(!inGarage && !dialog.open && !quickMenus.active && !scoreboard.open);
+  controls.setEnabled(
+    started && !paused && !inGarage && !dialog.open && !quickMenus.active && !scoreboard.open,
+  );
   $('intro').hidden = started;
   $('drive-toolbar').hidden = !started || inGarage;
   const wasPauseVisible = !$('pause-card').hidden;

@@ -2,10 +2,22 @@ import type { DrivingMode, Input } from './driving';
 import { touchPedals, touchSteering } from './touch-input';
 
 export class Controls {
-  private enabled = true;
+  private enabled = false;
   private keys = new Set<string>();
   private thumb:
-    { pointer: number; steer: number; accelerate: boolean; brake: boolean } | undefined;
+    | {
+        pointer: number;
+        surface: HTMLElement;
+        originX: number;
+        originY: number;
+        travelX: number;
+        travelY: number;
+        padSize: number;
+        steer: number;
+        accelerate: boolean;
+        brake: boolean;
+      }
+    | undefined;
   private abort = new AbortController();
   constructor() {
     const options = { signal: this.abort.signal };
@@ -57,47 +69,78 @@ export class Controls {
       options,
     );
     const pad = document.getElementById('thumb-pad')!;
+    const game = document.getElementById('game-shell')!;
+    const gesture = document.getElementById('touch-gesture')!;
     const moveThumb = (event: PointerEvent) => {
       if (event.pointerId !== this.thumb?.pointer) return;
-      const rect = pad.getBoundingClientRect();
-      const x = Math.max(
-        -1,
-        Math.min(1, (event.clientX - rect.left - rect.width / 2) / (rect.width * 0.46)),
-      );
-      const y = Math.max(
-        -1,
-        Math.min(1, (event.clientY - rect.top - rect.height / 2) / (rect.height * 0.38)),
-      );
-      this.thumb.steer = x;
-      Object.assign(this.thumb, touchPedals(y, this.thumb));
-      pad.style.setProperty('--thumb-x', `${x * rect.width * 0.25}px`);
-      pad.style.setProperty('--thumb-y', `${y * rect.height * 0.25}px`);
+      const thumb = this.thumb;
+      const x = Math.max(-1, Math.min(1, (event.clientX - thumb.originX) / thumb.travelX));
+      const y = Math.max(-1, Math.min(1, (event.clientY - thumb.originY) / thumb.travelY));
+      thumb.steer = x;
+      Object.assign(thumb, touchPedals(y, thumb));
+      pad.style.setProperty('--thumb-x', `${x * thumb.padSize * 0.25}px`);
+      pad.style.setProperty('--thumb-y', `${y * thumb.padSize * 0.25}px`);
+      gesture.style.setProperty('--gesture-x', `${x * 20}px`);
+      gesture.style.setProperty('--gesture-y', `${y * 20}px`);
     };
-    pad.addEventListener(
+    game.addEventListener(
       'pointerdown',
       (event) => {
-        if (!this.enabled) return;
+        if (!this.enabled || this.thumb || event.button !== 0) return;
+        if (!(event.target instanceof Element)) return;
+        // Listen before the document's outside-menu handler: dismissing a panel
+        // must not also start a driving gesture on that same touch.
+        if (
+          event.target.closest(
+            'button, a, input, select, textarea, label, dialog, [role="dialog"], [role="button"], [contenteditable]:not([contenteditable="false"]), [data-no-drive]',
+          )
+        )
+          return;
+        const onPad = pad.contains(event.target);
+        if (!onPad && !['touch', 'pen'].includes(event.pointerType)) return;
         event.preventDefault();
-        if (this.thumb) return;
-        pad.setPointerCapture(event.pointerId);
-        this.thumb = { pointer: event.pointerId, steer: 0, accelerate: false, brake: false };
+        const rect = pad.getBoundingClientRect();
+        // Keep the optional fixed pad's familiar coordinates. Everywhere else,
+        // the initial contact is neutral, with travel measured in CSS pixels
+        // (not a percentage of the whole screen or distance from the pad).
+        const size = rect.width || 128;
+        const surface = onPad ? pad : game;
+        surface.setPointerCapture(event.pointerId);
+        this.thumb = {
+          pointer: event.pointerId,
+          surface,
+          originX: onPad ? rect.left + size / 2 : event.clientX,
+          originY: onPad ? rect.top + rect.height / 2 : event.clientY,
+          travelX: size * 0.46,
+          travelY: size * 0.38,
+          padSize: size,
+          steer: 0,
+          accelerate: false,
+          brake: false,
+        };
+        gesture.hidden = onPad;
+        gesture.style.left = `${event.clientX}px`;
+        gesture.style.top = `${event.clientY}px`;
         pad.classList.add('pressed');
         moveThumb(event);
       },
       options,
     );
-    pad.addEventListener('pointermove', moveThumb, options);
+    game.addEventListener('pointermove', moveThumb, options);
     const releaseThumb = (event: PointerEvent) => {
       if (event.pointerId !== this.thumb?.pointer) return;
-      this.thumb = undefined;
-      pad.classList.remove('pressed');
-      pad.style.setProperty('--thumb-x', '0px');
-      pad.style.setProperty('--thumb-y', '0px');
+      this.releaseThumb();
     };
-    pad.addEventListener('pointerup', releaseThumb, options);
-    pad.addEventListener('pointercancel', releaseThumb, options);
-    pad.addEventListener('lostpointercapture', releaseThumb, options);
-    pad.addEventListener('contextmenu', (event) => event.preventDefault(), options);
+    game.addEventListener('pointerup', releaseThumb, options);
+    game.addEventListener('pointercancel', releaseThumb, options);
+    game.addEventListener('lostpointercapture', releaseThumb, options);
+    game.addEventListener(
+      'contextmenu',
+      (event) => {
+        if (this.thumb) event.preventDefault();
+      },
+      options,
+    );
   }
   read(mode: DrivingMode = 'cozy', speed = 0): Input & { frontView: boolean } {
     const left = this.keys.has('KeyA') || this.keys.has('ArrowLeft');
@@ -118,17 +161,23 @@ export class Controls {
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
     this.clear();
+    document.getElementById('game-shell')?.classList.toggle('touch-driving', enabled);
+  }
+  private releaseThumb() {
+    const thumb = this.thumb;
+    this.thumb = undefined;
+    const pad = document.getElementById('thumb-pad');
+    if (thumb?.surface.hasPointerCapture(thumb.pointer))
+      thumb.surface.releasePointerCapture(thumb.pointer);
+    const gesture = document.getElementById('touch-gesture');
+    if (gesture) gesture.hidden = true;
+    pad?.style.setProperty('--thumb-x', '0px');
+    pad?.style.setProperty('--thumb-y', '0px');
+    pad?.classList.remove('pressed');
   }
   clear() {
     this.keys.clear();
-    const pointer = this.thumb?.pointer;
-    this.thumb = undefined;
-    const pad = document.getElementById('thumb-pad');
-    if (pointer !== undefined && pad?.hasPointerCapture(pointer))
-      pad.releasePointerCapture(pointer);
-    pad?.style.setProperty('--thumb-x', '0px');
-    pad?.style.setProperty('--thumb-y', '0px');
-    document.querySelectorAll('.pressed').forEach((button) => button.classList.remove('pressed'));
+    this.releaseThumb();
   }
   dispose() {
     this.abort.abort();

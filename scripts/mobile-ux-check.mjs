@@ -206,13 +206,161 @@ export async function checkMobileUX(browser, origin, errors = []) {
       await page.keyboard.down('d');
       assert.ok((await advance(0.5)).steering > 0.85, 'keyboard steering is not softened');
       await page.keyboard.up('d');
+      await page.setViewportSize(viewport);
+      await page.waitForTimeout(80);
+      await page.locator('#restart').tap();
+      await advance(0.1);
+      const screenPad = await page.locator('#thumb-pad').boundingBox();
+      const finger = async (type, x, y, dx = 0, dy = 0) => {
+        const ended = ['touchEnd', 'touchCancel'].includes(type);
+        await cdp.send('Input.dispatchTouchEvent', {
+          type,
+          touchPoints: ended ? [] : [{ id: 1, x, y }],
+        });
+        await page.waitForFunction(
+          ({ ended, dx, dy, size }) => {
+            const pad = document.getElementById('thumb-pad');
+            const ring = document.getElementById('touch-gesture');
+            const clamp = (value) => Math.max(-1, Math.min(1, value));
+            return ended
+              ? !pad.classList.contains('pressed') && ring.hidden
+              : pad.classList.contains('pressed') &&
+                  !ring.hidden &&
+                  Math.abs(
+                    parseFloat(pad.style.getPropertyValue('--thumb-x')) -
+                      clamp(dx / (size * 0.46)) * size * 0.25,
+                  ) < 0.1 &&
+                  Math.abs(
+                    parseFloat(pad.style.getPropertyValue('--thumb-y')) -
+                      clamp(dy / (size * 0.38)) * size * 0.25,
+                  ) < 0.1;
+          },
+          { ended, dx, dy, size: screenPad.width },
+        );
+      };
+      // Both sides of the scene use a fresh, neutral origin, not the pad center.
+      for (const fraction of [0.2, 0.78]) {
+        const x = viewport.width * fraction,
+          y = viewport.height * 0.55;
+        await finger('touchStart', x, y);
+        assert.equal((await advance(0.2)).speed, 0, 'contact alone never accelerates');
+        await finger('touchMove', x + 20, y - 30, 20, -30);
+        const right = await advance(0.5);
+        assert.ok(right.speed > 1 && right.steering > 0.02 && right.steering < 0.4);
+        await finger('touchMove', x - 20, y - 30, -20, -30);
+        assert.ok(
+          (await advance(0.5)).steering < -0.02,
+          'relative left steering works from either side',
+        );
+        await finger('touchMove', x, y + 35, 0, 35);
+        assert.equal((await advance(1)).speed, 0, 'screen drag can fully stop');
+        const stopped = await advance(0.2);
+        assert.equal(
+          (await advance(0.3)).distance,
+          stopped.distance,
+          'holding the screen brake holds the car',
+        );
+        await finger('touchEnd');
+      }
+      assert.equal(await page.evaluate(() => scrollY), 0, 'driving never scrolls the page');
+      assert.equal(
+        await page.locator('#game-shell').evaluate((el) => getComputedStyle(el).touchAction),
+        'none',
+      );
+      const x = viewport.width * 0.2,
+        y = viewport.height * 0.55;
+      await finger('touchStart', x, y);
+      await finger('touchMove', x, y - 30, 0, -30);
+      const powered = await advance(0.5);
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchStart',
+        touchPoints: [
+          { id: 1, x, y: y - 30 },
+          { id: 2, x: viewport.width * 0.6, y },
+        ],
+      });
+      // CDP touchEnd lists the lifted finger, not the contacts remaining down.
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchEnd',
+        touchPoints: [{ id: 2, x: viewport.width * 0.6, y }],
+      });
+      assert.equal(
+        await page.locator('#touch-gesture').isVisible(),
+        true,
+        'a second finger cannot steal or release the gesture',
+      );
+      await finger('touchCancel');
+      assert.ok(
+        (await advance(0.4)).speed < powered.speed,
+        'screen cancellation releases throttle',
+      );
+
+      // Captured gestures continue across controls without activating them.
+      await finger('touchStart', x, y);
+      const pause = await page.locator('#pause').boundingBox();
+      const px = pause.x + pause.width / 2,
+        py = pause.y + pause.height / 2;
+      await finger('touchMove', px, py, px - x, py - y);
+      await finger('touchEnd');
+      assert.equal(await page.evaluate(() => window.__chillhill.paused), false);
+
+      // Opening a menu or pausing releases the gesture. A dismissal touch is
+      // consumed by the menu and must not restart driving midway through it.
+      await page.locator('[data-quick-menu="car-menu"]').tap();
+      assert.equal(
+        await page.locator('#game-shell').evaluate((el) => getComputedStyle(el).touchAction),
+        'auto',
+      );
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchStart',
+        touchPoints: [{ id: 1, x: 8, y: viewport.height - 8 }],
+      });
+      await page.waitForFunction(() => !window.__chillhill.quickMenu);
+      assert.equal(
+        await page.locator('#thumb-pad').evaluate((el) => el.classList.contains('pressed')),
+        false,
+      );
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+
+      await finger('touchStart', x, y);
+      await finger('touchMove', x, y - 30, 0, -30);
+      await page.keyboard.press('Escape');
+      assert.equal(await page.locator('#touch-gesture').isVisible(), false);
+      const pausedState = await advance(0.1);
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: [{ id: 1, x: x + 5, y: y - 35 }],
+      });
+      assert.equal((await advance(0.4)).distance, pausedState.distance);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      assert.equal(
+        await page.locator('#game-shell').evaluate((el) => getComputedStyle(el).touchAction),
+        'auto',
+      );
+      await page.locator('#pause-card [data-mode="challenge"]').tap();
+      assert.equal(
+        await page.locator('#thumb-pad').evaluate((el) => el.classList.contains('pressed')),
+        false,
+        'resuming never keeps an old gesture',
+      );
+      await finger('touchStart', x, y);
+      await page.setViewportSize({ width: viewport.height, height: viewport.width });
+      await page.waitForFunction(() => document.getElementById('touch-gesture').hidden);
+      await finger('touchCancel');
+      await page.setViewportSize(viewport);
+      await page.waitForTimeout(80);
+      await page.locator('#restart').tap();
+      await finger('touchStart', x, y);
+      await finger('touchMove', x + 20, y - 30, 20, -30);
+      await page.screenshot({ path: `artifacts/mobile-ux-anywhere-${viewport.width}.png` });
+      await finger('touchEnd');
     } finally {
       await page.close();
     }
   }
   assert.deepEqual(errors, []);
   console.log(
-    'PASS: forgiving touch corrections with full edge steering, throttle/brake/cancel/rotation, compact HUD, readable edge warnings, clear central road and five mobile/tablet viewports.',
+    'PASS: anywhere-on-screen neutral-origin steering, combined pedals, capture/cancel/rotation/pause/menu safety, optional fixed pad, compact HUD, readable edge warnings and five mobile/tablet viewports.',
   );
 }
 

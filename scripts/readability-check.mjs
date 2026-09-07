@@ -30,6 +30,7 @@ const overlayText = [
   '.thumb-hint',
   '.pad-up',
   '.pad-down',
+  '.pad-anywhere',
   '.challenge-hud',
   '.challenge-hud .eyebrow',
   '.challenge-message',
