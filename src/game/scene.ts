@@ -18,6 +18,7 @@ import { TrafficVisuals } from './traffic-visuals';
 import { roadShoulderWidth, roadsideMarkerOffset } from '../config/road';
 import { CollisionDebug } from './collision-debug';
 import { TerrainPrefetch } from './terrain-prefetch';
+import { placeCelestialLight } from './celestial-light';
 
 const CHUNK = 180;
 const UP = new THREE.Vector3(0, 1, 0);
@@ -166,21 +167,25 @@ export class GameScene {
     this.car.add(this.driftPivot);
     this.driftPivot.add(this.model);
     this.sunLight.castShadow = true;
+    this.sunLight.name = 'celestial-light';
     this.sunLight.shadow.mapSize.set(1024, 1024);
+    // Low sky angles need more depth and room for Tallwood's crowns, not a
+    // larger texture. Keep the normalized bias's world-space offset comparable.
     Object.assign(this.sunLight.shadow.camera, {
       left: -28,
       right: 28,
-      top: 35,
+      top: 55,
       bottom: -30,
       near: 1,
-      far: 160,
+      far: 300,
     });
-    this.sunLight.shadow.bias = -0.001;
+    this.sunLight.shadow.bias = -0.0005;
     this.sunLight.shadow.normalBias = 0.12;
     this.sun = new THREE.Mesh(
       new THREE.SphereGeometry(23, 24, 16),
       new THREE.MeshBasicMaterial({ color: '#fff3ce', fog: false }),
     );
+    this.sun.name = 'celestial-disc';
     this.scene.add(this.sun);
     this.applySettings(settings);
     this.observer = new ResizeObserver(() => this.resize());
@@ -434,6 +439,7 @@ export class GameScene {
     );
     trunks.name = forest ? 'tallwood-trunks' : 'tree-trunks';
     crowns.name = desert ? 'desert-shrubs' : forest ? 'tallwood-canopy' : 'tree-crowns';
+    trunks.castShadow = true;
     crowns.castShadow = true;
     tops.castShadow = true;
     const instance = (
@@ -862,21 +868,14 @@ export class GameScene {
       moving && challenge?.phase === 'racing' ? dt : 0,
       this.headlight.intensity,
     );
-    this.sunLight.position.set(
-      road.x - 35,
-      road.y - this.originHeight + this.lightHeight,
-      this.originDistance - state.distance + 20,
-    );
     this.sunLight.target.position.set(
       road.x,
       road.y - this.originHeight,
       this.originDistance - state.distance - 15,
     );
-    this.sun.position.set(
-      road.x + 240,
-      road.y - this.originHeight + this.lightHeight * 2.2,
-      this.originDistance - state.distance - 850,
-    );
+    // The visible sky and the shadow map share this frame's blended direction.
+    // Do not aim the light from the camera: holding V must not flip the shadows.
+    placeCelestialLight(this.sunLight, this.sun, this.camera.position, this.lightHeight);
     this.model.localToWorld(this.rearLeft.copy(this.vehicle.rearLeft));
     this.model.localToWorld(this.rearRight.copy(this.vehicle.rearRight));
     this.smoke.update(
@@ -947,6 +946,7 @@ export class GameScene {
     this.water.dispose();
     this.lakeWater.dispose();
     this.headlight.dispose();
+    this.sunLight.dispose();
     for (const [id, chunk] of this.chunks) this.removeChunk(id, chunk);
     this.city.dispose();
     this.traffic.dispose();

@@ -116,6 +116,8 @@ The sea is deliberately stylized: its surface follows the same endless downhill 
 
 ### A world that keeps moving
 
+The visible sun/moon and the directional light share one world-space direction (`src/game/celestial-light.ts`). Tree trunks, crowns and cars cast shadows away from that source, with longer shadows at lower sky elevations. Camera turns and held-V front view do not move the light around the car. Sky placement and lighting use the same eased elevation during time changes, and remain aligned when the infinite world rebases. A single 1024×1024 shadow map stays centered near the road; the garage keeps its independent studio lights.
+
 By default a full day takes **10 minutes of active play**: daylight → sunset → moonlight → dawn, each lasting **2.5 minutes**. Every **three days (30 active minutes)** the season advances: spring → summer → autumn → winter → spring. Blue hour remains available manually and leads into moonlight. Weather rolls separately every **3.5 minutes**, with season-aware rain/snow and drier desert weighting; a day or season boundary does not force a weather change.
 
 Advanced settings includes independent hold/automatic controls for daylight, seasons and weather, plus day length, days per season and weather interval. Holding daylight also holds calendar progression; weather can continue independently. Manual time/season/weather picks restart only that ingredient's interval. The welcome screen, pause, menus, garage and background tabs do not advance these clocks. Restarting a drive keeps its world time; refreshing starts a new clock from the saved atmosphere preferences. Automatic transitions are not written to storage on every phase.
@@ -209,6 +211,8 @@ npm run build
 npm run test:browser
 # Focused world-composer rendering, file round trips, and coastal streaming:
 npm run test:world
+# Sun/moon shadow direction, tall-tree coverage, camera changes and before/after renders:
+node scripts/shadows-check.mjs
 # Focused new landscapes, both cameras, mobile selection, level lakes and resource recycling:
 npm run test:landscapes
 # Focused actual-app world clock, challenge driving, and text contrast:

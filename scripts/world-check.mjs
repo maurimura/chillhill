@@ -212,14 +212,21 @@ export async function checkWorld(browser, origin, errors) {
   await mobile.screenshot({ path: 'artifacts/world-composer-mobile.png' });
   assert.ok(await mobile.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await mobile.locator('#close-world-menu').tap();
+  assert.equal(
+    await mobile.locator('.world-label').isVisible(),
+    true,
+    'the welcome header names the landscape',
+  );
   await mobile.locator('#start').tap();
   await mobile.waitForTimeout(900);
   await mobile.screenshot({ path: 'artifacts/summer-coast-mobile.png' });
   const nav = await mobile.locator('.site-header').boundingBox();
-  const label = await mobile.locator('.world-label').boundingBox();
   const weather = await mobile.locator('#open-world-menu').boundingBox();
-  assert.ok(label.y >= nav.y && label.y + label.height <= nav.y + nav.height);
-  assert.ok(label.x + label.width <= (await mobile.locator('.header-actions').boundingBox()).x);
+  assert.equal(
+    await mobile.locator('.world-label').isVisible(),
+    false,
+    'the compact mobile driving header leaves room for the drive controls',
+  );
   assert.ok(weather.y >= nav.y && weather.y + weather.height <= nav.y + nav.height);
   await mobile.close();
   console.log(
