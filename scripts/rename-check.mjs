@@ -4,9 +4,9 @@ export async function checkRename(browser, origin, errors) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   page.on('pageerror', (error) => errors.push(error.message));
   const settings = {
-    car: 'astra-sedan',
+    car: 'astra',
     style: 'coastal',
-    paint: { 'astra-sedan': '#123456' },
+    paint: { astra: '#123456' },
     landscape: 'coast',
     wind: 0.75,
   };
@@ -55,11 +55,8 @@ export async function checkRename(browser, origin, errors) {
     await page.locator('#saved-scenes').selectOption('0');
     await page.locator('#load-scene').click();
     assert.equal(await page.evaluate(() => window.__chillhill.settings.seed), 17);
-    assert.equal(await page.evaluate(() => window.__chillhill.settings.car), 'astra-sedan');
-    assert.equal(
-      await page.evaluate(() => window.__chillhill.settings.paint['astra-sedan']),
-      '#426453',
-    );
+    assert.equal(await page.evaluate(() => window.__chillhill.settings.car), 'astra');
+    assert.equal(await page.evaluate(() => window.__chillhill.settings.paint.astra), '#426453');
     await page.locator('#scene-file').setInputFiles({
       name: 'chill-the-hill.scene.json',
       mimeType: 'application/json',

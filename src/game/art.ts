@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import type { Settings } from '../config';
 import { roadAt, roadElevation, terrainAt } from './route';
+import { roadSupportWidth } from '../config/road';
 
 /** Blend facet normals into the shape's smooth normals as softness increases. */
 export function softenNormals(source: THREE.BufferGeometry, amount: number) {
@@ -43,6 +44,22 @@ export function softRock(amount: number) {
   return softenNormals(new THREE.IcosahedronGeometry(1, amount === 0 ? 0 : 2), amount);
 }
 
+/** A broad, stepped sandstone plateau; softness rounds its edges, not its identity. */
+export function mesaGeometry(amount: number) {
+  const profile = [
+    [0, -0.5],
+    [1, -0.5],
+    [0.95, -0.32],
+    [0.8, -0.23],
+    [0.78, -0.03],
+    [0.66, 0.05],
+    [0.62, 0.37],
+    [0.55, 0.5],
+    [0, 0.5],
+  ].map(([x, y]) => new THREE.Vector2(x, y));
+  return softenNormals(new THREE.LatheGeometry(profile, amount === 0 ? 6 : 12), amount * 0.65);
+}
+
 export function terrainGeometry(
   start: number,
   length: number,
@@ -62,9 +79,9 @@ export function terrainGeometry(
     -32,
     -21,
     -half - 5,
-    -half - 1.3,
+    -half - roadSupportWidth,
     0,
-    half + 1.3,
+    half + roadSupportWidth,
     half + 5,
     21,
     32,
@@ -74,6 +91,7 @@ export function terrainGeometry(
     180,
     280,
     420,
+    ...(settings.landscape === 'city' ? [620, 900] : []),
   ];
   const subdivisions = settings.roundness === 0 ? 1 : 3;
   const offsets: number[] = [];

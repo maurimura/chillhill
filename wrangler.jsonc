@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "chillhill",
+  "account_id": "5b2d633eadd0f2e2a9c9f773f5e7a1d0",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-07",
+  "workers_dev": false,
+  "routes": [{ "pattern": "chillhill.maurimura.dev", "custom_domain": true }],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"],
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "chillhill-leaderboard",
+      "database_id": "516dde9e-0027-4ea0-9823-5c8a90548a16",
+      "migrations_dir": "migrations",
+    },
+  ],
+}

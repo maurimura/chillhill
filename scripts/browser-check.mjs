@@ -3,10 +3,32 @@ import { mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { checkCameraFraming } from './camera-check.mjs';
 import { checkGarage } from './garage-check.mjs';
+import { checkVehicleShading } from './vehicle-shading-check.mjs';
+import { checkGarageLayout } from './garage-layout-check.mjs';
+import { checkRouteRefresh } from './route-refresh-check.mjs';
+import { checkTreeOcclusion } from './tree-occlusion-check.mjs';
+import { checkPauseEnter } from './pause-enter-check.mjs';
 import { checkLayout } from './layout-check.mjs';
 import { checkWorld } from './world-check.mjs';
 import { checkRename } from './rename-check.mjs';
 import { checkQuickMenus } from './quick-menus-check.mjs';
+import { checkClassicCars } from './classic-cars-check.mjs';
+import { checkLandscapes } from './landscapes-check.mjs';
+import { checkMusic } from './music-check.mjs';
+import { checkRetiredCar } from './retired-car-check.mjs';
+import { checkCarMenu } from './car-menu-check.mjs';
+import { checkWorldClock } from './world-clock-check.mjs';
+import { checkChallenge } from './challenge-check.mjs';
+import { checkScoreboard } from './scoreboard-check.mjs';
+import { checkOnlineScoreboard } from './online-scoreboard-check.mjs';
+import { checkSpeedWidth } from './speed-width-check.mjs';
+import { checkReadability } from './readability-check.mjs';
+import { checkModeEntry } from './mode-entry-check.mjs';
+import { checkOffRoad } from './offroad-check.mjs';
+import { checkHitboxes } from './hitbox-check.mjs';
+import { checkPauseFocus } from './pause-focus-check.mjs';
+import { checkPerformanceRegressions } from './performance-regression-check.mjs';
+import { checkUnits } from './units-check.mjs';
 
 // Uses an isolated browser profile; does not touch your normal Chrome session.
 const browser = await chromium.launch({
@@ -120,7 +142,7 @@ try {
   await page.locator('#open-car-menu').click();
   const settingsDistance = await page.evaluate(() => window.__chillhill.state.distance);
   const settingsSpeed = await page.evaluate(() => window.__chillhill.state.speed);
-  for (const car of ['wagon', 'astra', 'astra-sedan']) {
+  for (const car of ['wagon', 'astra', 'peugeot-206']) {
     await page.locator(`[data-car="${car}"]`).click();
     await page.waitForTimeout(200);
     assert.equal(await page.locator(`[data-car="${car}"]`).getAttribute('aria-pressed'), 'true');
@@ -139,7 +161,7 @@ try {
   assert.equal(await page.evaluate(() => window.__chillhill.state.distance), advancedDistance);
   assert.equal(await page.evaluate(() => window.__chillhill.settings.roadWidth), 13);
   assert.equal(await page.evaluate(() => window.__chillhill.settings.roundness), 0.8);
-  assert.equal(await page.evaluate(() => window.__chillhill.settings.car), 'astra-sedan');
+  assert.equal(await page.evaluate(() => window.__chillhill.settings.car), 'peugeot-206');
   await page.screenshot({ path: 'artifacts/desktop-settings.png' });
   const downloadPromise = page.waitForEvent('download');
   await page.locator('#export-settings').click();
@@ -150,7 +172,7 @@ try {
   assert.equal(await page.evaluate(() => window.__chillhill.settings.style), 'golden');
   assert.equal(await page.evaluate(() => window.__chillhill.settings.roadWidth), 13);
   assert.equal(await page.evaluate(() => window.__chillhill.settings.roundness), 0.8);
-  assert.equal(await page.evaluate(() => window.__chillhill.settings.car), 'astra-sedan');
+  assert.equal(await page.evaluate(() => window.__chillhill.settings.car), 'peugeot-206');
   await page.locator('#open-settings').click();
   await page.locator('#reset-settings').click();
   assert.equal(await page.evaluate(() => window.__chillhill.settings.car), 'astra');
@@ -197,8 +219,8 @@ try {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await mobile.screenshot({ path: 'artifacts/mobile-driving.png' });
   await mobile.locator('#open-car-menu').tap();
-  await mobile.locator('[data-car="astra-sedan"]').tap();
-  assert.equal(await mobile.evaluate(() => window.__chillhill.settings.car), 'astra-sedan');
+  await mobile.locator('[data-car="peugeot-206"]').tap();
+  assert.equal(await mobile.evaluate(() => window.__chillhill.settings.car), 'peugeot-206');
   await mobile.screenshot({ path: 'artifacts/mobile-car-selector.png' });
   await mobile.locator('#open-settings').tap();
   await mobile.locator('[data-style="dusk"]').tap();
@@ -215,6 +237,7 @@ try {
     const scene = new GameScene(element, defaults);
     const counts = [];
     let maxLocalCoordinate = 0,
+      maxSeaCoordinate = 0,
       maxCameraDistance = 0,
       maxChunks = 0;
     const distances = [...Array.from({ length: 15 }, (_, i) => 20 + i * 180), 10000000, 10000180];
@@ -240,8 +263,13 @@ try {
         scene.scene.traverse((item) => {
           if (!item.geometry) return;
           const positions = item.geometry.getAttribute('position').array;
-          for (const value of positions)
-            maxLocalCoordinate = Math.max(maxLocalCoordinate, Math.abs(value));
+          for (const value of positions) {
+            // The coast intentionally extends 2.2 km sideways to the horizon.
+            // Keep its extent separate so terrain/road rebasing stays strict.
+            if (item.name === 'coastal-water')
+              maxSeaCoordinate = Math.max(maxSeaCoordinate, Math.abs(value));
+            else maxLocalCoordinate = Math.max(maxLocalCoordinate, Math.abs(value));
+          }
         });
       }
     }
@@ -310,6 +338,7 @@ try {
       smokeFrozen,
       fadedSmoke,
       maxLocalCoordinate,
+      maxSeaCoordinate,
       maxCameraDistance,
       maxChunks,
       smokeBeforeCrossing,
@@ -346,6 +375,10 @@ try {
   assert.ok(
     worldCheck.maxLocalCoordinate < 2000,
     'GPU geometry should stay near the origin even after 10,000 km',
+  );
+  assert.ok(
+    worldCheck.maxSeaCoordinate > 2200 && worldCheck.maxSeaCoordinate < 2400,
+    `coastal water should retain its bounded horizon extent after rebasing (${worldCheck.maxSeaCoordinate})`,
   );
   assert.ok(
     worldCheck.maxCameraDistance < 35,
@@ -394,6 +427,12 @@ try {
           wheelbase: rearWheel.position.z - frontWheel.position.z,
           frontTrack: -2 * frontWheel.position.x,
           rearTrack: -2 * rearWheel.position.x,
+          frontRadius: frontWheel.children[0].userData.tireRadius,
+          rearRadius: rearWheel.children[0].userData.tireRadius,
+          rearTireWidth: rearWheel.children[0].userData.tireWidth,
+          expectedFrontRadius: spec.tireRadius,
+          expectedRearRadius: spec.rearTireRadius ?? spec.tireRadius,
+          expectedRearTireWidth: spec.rearTireWidth ?? spec.tireWidth,
           expectedWheelbase: spec.wheelbase,
           expectedFrontTrack: spec.frontTrack,
           expectedRearTrack: spec.rearTrack,
@@ -458,6 +497,9 @@ try {
     assert.ok(Math.abs(sample.wheelbase - sample.expectedWheelbase) < 1e-10);
     assert.equal(sample.frontTrack, sample.expectedFrontTrack);
     assert.equal(sample.rearTrack, sample.expectedRearTrack);
+    assert.equal(sample.frontRadius, sample.expectedFrontRadius);
+    assert.equal(sample.rearRadius, sample.expectedRearRadius);
+    assert.equal(sample.rearTireWidth, sample.expectedRearTireWidth);
     assert.ok(sample.frontMovement < 1e-10 && sample.rearMovement > 1);
     const first = carChecks.samples.find((other) => other.car === sample.car);
     assert.equal(sample.geometry, first.geometry, 'switching cars must release old geometry');
@@ -478,7 +520,7 @@ try {
     assert.equal(Math.min(...check.chunks), check.chunk - (check.frontView ? 5 : 1));
     assert.equal(Math.max(...check.chunks), check.chunk + (check.frontView ? 1 : 5));
   }
-  for (const car of ['astra', 'astra-sedan', 'wagon']) {
+  for (const car of ['astra', 'peugeot-206', 'wagon']) {
     for (const front of [true, false]) {
       await page.evaluate(({ car, front }) => window.__carCheck.preview(car, 0.65, front), {
         car,
@@ -506,10 +548,32 @@ try {
   console.log('Car GPU usage:', carChecks.samples.slice(0, 3));
   await checkCameraFraming(page);
   await checkGarage(browser, origin, errors);
+  await checkGarageLayout(browser, origin, errors);
+  await checkRouteRefresh(browser, origin, errors);
+  await checkClassicCars(browser, origin, errors);
+  await checkVehicleShading(browser, origin, errors);
   await checkQuickMenus(browser, origin, errors);
+  await checkPauseEnter(browser, origin, errors);
+  await checkCarMenu(browser, origin, errors);
   await checkLayout(browser, origin, errors);
   await checkWorld(browser, origin, errors);
+  await checkLandscapes(browser, origin, errors);
+  await checkTreeOcclusion(browser, origin, errors);
+  await checkMusic(browser, origin, errors);
+  await checkRetiredCar(browser, origin, errors);
   await checkRename(browser, origin, errors);
+  await checkWorldClock(browser, origin, errors);
+  await checkUnits(browser, origin, errors);
+  await checkSpeedWidth(browser, origin, errors);
+  await checkChallenge(browser, origin, errors);
+  await checkScoreboard(browser, origin, errors);
+  await checkOnlineScoreboard(browser, origin, errors);
+  await checkOffRoad(browser, origin, errors);
+  await checkHitboxes(browser, origin, errors);
+  await checkPauseFocus(browser, origin, errors);
+  await checkPerformanceRegressions(browser, origin, errors);
+  await checkModeEntry(browser, origin, errors);
+  await checkReadability(browser, origin, errors);
   assert.deepEqual(errors, [], 'browser should not report application errors');
   console.log(
     'PASS: hold-V front camera/release/repeat/focus/pause, camera framing and bidirectional streaming for every car, desktop/mobile driving and car selection, factory axle positions, car switching/persistence/disposal, brake priority, smooth rear drift, smoke emission/fading/pause, front-axle pivot, shape softness, settings/export, endless streaming at 10,000 km, bounded geometry and particles, and all art presets.',

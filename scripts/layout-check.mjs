@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { selectGarageTool } from './garage-tools.mjs';
 
 const overlaps = (a, b) =>
   a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
@@ -13,6 +14,22 @@ async function checkNav(page, garage) {
     assert.ok(box.x >= 0 && box.x + box.width <= page.viewportSize().width);
     assert.ok(Math.abs(box.y + box.height / 2 - (nav.y + nav.height / 2)) < 1);
   }
+  const mark = await page.locator('.brand-mark').boundingBox();
+  const mountain = await page.locator('.brand-mark svg').evaluate((svg) => {
+    const box = svg.getBBox();
+    const center = new DOMPoint(box.x + box.width / 2, box.y + box.height / 2);
+    const screen = center.matrixTransform(svg.getScreenCTM());
+    return { x: screen.x, y: screen.y };
+  });
+  assert.ok(Math.abs(mountain.x - (mark.x + mark.width / 2)) < 0.1);
+  assert.ok(
+    Math.abs(mountain.y - (mark.y + mark.height / 2)) < 0.1,
+    'the mountain artwork itself is centered inside its circle',
+  );
+  if (await page.locator('.brand-name').isVisible()) {
+    const name = await page.locator('.brand-name').boundingBox();
+    assert.ok(Math.abs(name.y + name.height / 2 - (mark.y + mark.height / 2)) < 1);
+  }
   assert.equal(await page.locator('#open-car-menu').isVisible(), !garage);
   assert.equal(await page.locator('#open-world-menu').isVisible(), !garage);
   assert.equal(await page.locator('.site-header #open-garage, .weather-label').count(), 0);
@@ -25,6 +42,39 @@ async function checkNav(page, garage) {
     const road = await page.locator('#world-label').boundingBox();
     assert.ok(road.x >= brand.x + brand.width, 'road name sits beside the shared brand');
     assert.ok(Math.abs(road.y + road.height / 2 - (brand.y + brand.height / 2)) < 1);
+    const label = await page.locator('#place').boundingBox();
+    assert.ok(
+      Math.abs(label.y + label.height / 2 - (brand.y + brand.height / 2)) < 1,
+      'the landscape line box stays aligned with the brand',
+    );
+    const spacing = await page.locator('.nav-identity').evaluate((el) => {
+      const glass = getComputedStyle(el, '::before');
+      const road = getComputedStyle(el.querySelector('#world-label'));
+      return {
+        inset: [glass.top, glass.right, glass.bottom, glass.left],
+        divider: parseFloat(road.borderLeftWidth),
+      };
+    });
+    assert.deepEqual(spacing.inset, ['0px', '0px', '0px', '0px']);
+    assert.ok(
+      Math.abs(mark.y - identity.y - (identity.y + identity.height - mark.y - mark.height)) < 1,
+    );
+    if (spacing.divider) {
+      assert.ok(
+        Math.abs(
+          label.x -
+            road.x -
+            spacing.divider -
+            (identity.x + identity.width - label.x - label.width),
+        ) < 1,
+        'landscape lettering has equal space between the divider and the right edge of the glass',
+      );
+    } else {
+      assert.ok(
+        Math.abs(label.x + label.width / 2 - (road.x + road.width / 2)) < 1,
+        'wrapped mobile landscape names are centered in their available space',
+      );
+    }
     assert.ok(road.x + road.width <= actions.x, 'road name does not cover controls');
     assert.deepEqual(
       await page.locator('.site-header').evaluate((nav) => {
@@ -42,15 +92,14 @@ async function checkNav(page, garage) {
     assert.ok(Math.abs(brand.y + brand.height / 2 - (title.y + title.height / 2)) < 1);
     assert.equal(await page.locator('.garage-heading').count(), 0);
     assert.equal(await page.locator('#drive-toolbar').isVisible(), false);
-    const stageIsBelowNav = await page.evaluate(
-      () =>
-        scrollY === 0 ||
-        getComputedStyle(document.querySelector('.garage-stage')).position === 'sticky',
+    const stage = await page.locator('.garage-stage').boundingBox();
+    assert.ok(stage.y >= nav.y + nav.height, 'garage preview sits below the only header');
+    assert.ok(
+      await page.evaluate(
+        () => document.documentElement.scrollHeight <= innerHeight && scrollY === 0,
+      ),
+      'the whole garage fits without page scrolling',
     );
-    if (stageIsBelowNav) {
-      const stage = await page.locator('.garage-stage').boundingBox();
-      assert.ok(stage.y >= nav.y + nav.height, 'garage preview sits below the only header');
-    }
   }
 }
 
@@ -65,7 +114,7 @@ async function checkDrive(page) {
         document.documentElement.scrollHeight <= innerHeight &&
         scrollY === 0,
     ),
-    'driving has no page margins or scrolling, including after leaving a scrolled garage',
+    'driving has no page margins or scrolling, including after leaving the garage',
   );
   await checkNav(page, false);
   const selectors = ['.route-card', '.speed-card'];
@@ -141,6 +190,7 @@ export async function checkLayout(browser, origin, errors) {
       await checkNav(page, true);
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       await page.screenshot({ path: `artifacts/layout-garage-${viewport.width}.png` });
+      await selectGarageTool(page, 'paint');
       await page.locator('[data-paint="#426453"]').click();
       await checkNav(page, true);
       await page.locator('#back-drive').click();
@@ -151,6 +201,6 @@ export async function checkLayout(browser, origin, errors) {
     }
   }
   console.log(
-    'PASS: full-viewport driving, single-row shared nav, in-game controls without overlaps, compact garage header, and scrolled garage return on desktop, mobile, narrow mobile, and landscape.',
+    'PASS: full-viewport driving and garage, single-row shared nav, in-game controls without overlaps, and garage return on desktop, mobile, narrow mobile, and landscape.',
   );
 }

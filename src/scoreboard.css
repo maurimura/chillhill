@@ -1,0 +1,498 @@
+/* Keep records and scoring in the same quiet cream/sage HUD language. */
+.challenge-hud {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  width: 250px;
+  gap: 5px 10px;
+  z-index: 4;
+}
+.score-category {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--overlay-muted);
+}
+.score-total {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+  text-align: left;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.score-total strong {
+  font-size: 25px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.score-total span {
+  font-size: 9px;
+  color: var(--overlay-muted);
+}
+.score-total:focus-visible {
+  outline: 2px solid var(--overlay-accent);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+.score-total:disabled {
+  cursor: default;
+}
+.score-streak {
+  align-self: center;
+  color: var(--overlay-accent);
+  font-size: 12px;
+}
+.score-stats {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 10px;
+  color: var(--overlay-muted);
+}
+.score-feedback {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  max-width: 100%;
+  padding: 7px 10px;
+  border-radius: 9px;
+  background: var(--overlay-surface);
+  color: var(--overlay-accent);
+  border: 1px solid var(--overlay-line);
+  font-size: 10px;
+}
+.pause-card.has-results {
+  width: min(500px, calc(100% - 28px));
+  padding: 28px;
+  max-height: calc(100dvh - 32px);
+  top: 50%;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.pause-card.has-leaderboard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 28px;
+  width: min(1040px, calc(100% - 32px));
+  max-height: calc(100dvh - 148px);
+  top: calc(50% + 12px);
+}
+.pause-summary,
+#run-leaderboard {
+  min-width: 0;
+}
+.has-results .pause-summary {
+  align-self: start;
+  padding-block: 12px;
+}
+#run-leaderboard {
+  text-align: left;
+  border-left: 1px solid var(--overlay-line);
+  padding-left: 28px;
+}
+#run-leaderboard .scoreboard-heading {
+  padding: 0 0 12px;
+}
+#run-leaderboard .scoreboard-body {
+  padding: 0;
+  overflow: visible;
+}
+#run-leaderboard #scoreboard-category-note {
+  font-size: 10px;
+  line-height: 1.5;
+}
+#run-leaderboard .scoreboard-tabs button {
+  flex: 1;
+  padding: 7px 10px;
+}
+#run-leaderboard #scoreboard-list {
+  max-height: 350px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--overlay-line) transparent;
+  padding: 2px;
+}
+#run-leaderboard .online-run {
+  margin: 0 0 12px;
+  padding: 12px;
+}
+#run-leaderboard .online-run h3 {
+  font-size: 23px;
+}
+#run-leaderboard .scoreboard-row {
+  padding: 7px 4px;
+  align-items: center;
+}
+#run-leaderboard .scoreboard-points {
+  font-size: 16px;
+  line-height: 1.1;
+}
+#run-leaderboard .scoreboard-ride > span,
+#run-leaderboard .scoreboard-points small,
+#run-leaderboard .scoreboard-ride time,
+#run-leaderboard .scoreboard-ride details,
+#run-leaderboard .online-run > .eyebrow,
+#run-leaderboard .online-run h3 {
+  display: none;
+}
+.pause-card.has-results h2 {
+  margin: 10px 0;
+  font-size: 30px;
+}
+.result-heading {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+.result-score {
+  font-size: 38px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.result-score small {
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--overlay-muted);
+  font-weight: 400;
+}
+.result-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 8px;
+  margin: 16px 0;
+}
+.result-stats dt {
+  color: var(--overlay-muted);
+  font-size: 10px;
+}
+.result-stats dd {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.pause-card .result-note {
+  font-size: 10px;
+  margin-bottom: 0;
+}
+.pause-card .scoreboard-link {
+  color: var(--overlay-accent);
+  font-size: 11px;
+  margin-top: 12px;
+}
+#scoreboard-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  transform: none;
+  width: min(640px, calc(100% - 24px));
+  height: auto;
+  max-height: calc(100dvh - 24px);
+  max-width: none;
+  padding: 0;
+  border: 1px solid var(--overlay-line);
+  border-radius: 18px;
+  background: var(--overlay-surface);
+  color: var(--overlay-ink);
+  backdrop-filter: blur(18px);
+  overflow: hidden;
+}
+#scoreboard-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  animation: none;
+}
+.scoreboard-content {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+#scoreboard-dialog::backdrop {
+  background: #101b1a80;
+  backdrop-filter: blur(4px);
+}
+.scoreboard-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 22px 24px 16px;
+  flex: 0 0 auto;
+}
+.scoreboard-heading .eyebrow {
+  color: var(--overlay-accent);
+  font-size: 9px;
+}
+.scoreboard-heading h2 {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 32px;
+  font-weight: 400;
+  letter-spacing: -0.8px;
+  margin: 8px 0 0;
+}
+#scoreboard-dialog .icon-button {
+  color: var(--overlay-ink);
+  font-size: 30px;
+  flex-shrink: 0;
+}
+.scoreboard-body {
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0 24px 22px;
+  min-height: 0;
+}
+.scoreboard-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+.scoreboard-tabs button {
+  /* Inverting text/background together avoids low contrast mid-transition. */
+  transition: transform 0.2s;
+  border: 1px solid var(--overlay-line);
+  background: transparent;
+  color: var(--overlay-ink);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.scoreboard-tabs button[aria-pressed='true'] {
+  color: #26372b;
+  background: var(--overlay-accent);
+  border-color: var(--overlay-accent);
+}
+.scoreboard-body .eyebrow {
+  color: var(--overlay-accent);
+  font-size: 9px;
+}
+#scoreboard-dialog :focus-visible {
+  outline: 2px solid var(--overlay-accent);
+  outline-offset: 2px;
+}
+#scoreboard-category-note,
+.scoreboard-storage,
+.scoring-rules,
+#scoreboard-dialog .result-note {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--overlay-muted);
+}
+#scoreboard-list {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0;
+}
+.scoreboard-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 13px 8px;
+  border-top: 1px solid var(--overlay-line);
+  align-items: start;
+}
+.scoreboard-row.is-current-run {
+  border-radius: 8px;
+  background: #c7d6b714;
+}
+.scoreboard-rank {
+  color: var(--overlay-accent);
+  font-size: 12px;
+}
+.scoreboard-ride > strong {
+  display: block;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.scoreboard-ride > span,
+.scoreboard-ride time {
+  display: block;
+  font-size: 10px;
+  color: var(--overlay-muted);
+  margin-top: 4px;
+}
+.scoreboard-ride details {
+  color: var(--overlay-muted);
+  font-size: 10px;
+  line-height: 1.5;
+  margin-top: 6px;
+}
+.scoreboard-content summary {
+  cursor: pointer;
+  color: var(--overlay-accent);
+}
+.scoreboard-points {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  max-width: 12ch;
+  overflow-wrap: anywhere;
+}
+.scoreboard-points small {
+  display: block;
+  font-size: 9px;
+  color: var(--overlay-muted);
+  font-weight: 400;
+}
+.online-run {
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--overlay-line);
+  border-radius: 12px;
+  background: #c7d6b714;
+}
+.online-run h3 {
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 25px;
+  font-weight: 400;
+  margin: 8px 0;
+}
+.online-run p,
+.pause-card .online-run p {
+  color: var(--overlay-muted);
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 8px 0;
+}
+.online-run label {
+  display: block;
+  font-size: 12px;
+  margin: 12px 0 6px;
+}
+.leaderboard-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.leaderboard-name-row input {
+  flex: 1 1 150px;
+  min-width: 0;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--overlay-line);
+  padding: 10px 12px;
+  background: #15231ec0;
+  color: var(--overlay-ink);
+  font: inherit;
+  font-size: 16px;
+}
+.leaderboard-name-row button {
+  border: 1px solid var(--overlay-accent);
+  background: var(--overlay-accent);
+  color: #26372b;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.online-run .text-button,
+#refresh-leaderboard {
+  color: var(--overlay-accent);
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .pause-card.has-results {
+    grid-template-columns: minmax(0, 1fr);
+    width: min(560px, calc(100% - 24px));
+    padding: 20px;
+    gap: 24px;
+  }
+  .has-results .pause-summary {
+    padding: 0;
+  }
+  #run-leaderboard {
+    border-left: 0;
+    border-top: 1px solid var(--overlay-line);
+    padding: 22px 0 0;
+  }
+}
+.scoreboard-empty {
+  padding: 30px 12px;
+  color: var(--overlay-muted);
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.scoring-rules {
+  border-top: 1px solid var(--overlay-line);
+  padding-top: 14px;
+}
+@media (max-width: 650px), (pointer: coarse) {
+  .challenge-hud {
+    gap: 4px 6px;
+    padding: 8px 10px;
+  }
+  .challenge-hud .eyebrow {
+    font-size: 7px;
+    letter-spacing: 1.2px;
+  }
+  .score-category {
+    font-size: 7px;
+    letter-spacing: 0.5px;
+  }
+  .score-total strong {
+    font-size: 21px;
+  }
+  .score-stats {
+    font-size: 9px;
+    gap: 3px 8px;
+  }
+  .score-streak {
+    font-size: 10px;
+  }
+}
+@media (max-width: 380px) {
+  .scoreboard-heading {
+    padding: 16px 14px 12px;
+  }
+  .scoreboard-heading h2 {
+    font-size: 27px;
+  }
+  .scoreboard-body {
+    padding: 0 14px 16px;
+  }
+  .scoreboard-row {
+    gap: 6px;
+    padding-inline: 0;
+    grid-template-columns: 16px minmax(0, 1fr) auto;
+  }
+  .scoreboard-points {
+    font-size: 15px;
+    max-width: 8ch;
+  }
+  .pause-card.has-results {
+    padding: 16px;
+  }
+  .result-stats {
+    gap: 10px 6px;
+  }
+}
+@media (max-height: 600px) and (orientation: landscape) {
+  .pause-card.has-results {
+    padding: 12px 20px;
+  }
+  .pause-card.has-results .result-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin: 10px 0;
+  }
+  .pause-card.has-results .result-score {
+    font-size: 28px;
+  }
+  .pause-card.has-results .result-heading {
+    margin: 8px 0;
+  }
+  .pause-card.has-results #pause-copy {
+    display: none;
+  }
+}

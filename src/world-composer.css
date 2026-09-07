@@ -39,7 +39,7 @@
 .scene-recipe small {
   display: block;
   font-size: 9px;
-  color: #7c8873;
+  color: var(--muted);
   line-height: 1.5;
   margin-top: 4px;
 }
@@ -100,6 +100,71 @@
   border-top: 1px solid #dce1d2;
   padding: 13px 0;
 }
+.recipe-preview.city {
+  background: linear-gradient(#555f82 0 50%, #323e55 50%);
+}
+.recipe-preview.city i {
+  left: 22px;
+  top: 17px;
+  width: 7px;
+  height: 40px;
+  border: 0;
+  border-radius: 0;
+  transform: none;
+  background: repeating-linear-gradient(0deg, #e3bd7e 0 2px, #455067 2px 7px);
+  box-shadow:
+    10px 6px #46526c,
+    21px -4px #3a465e;
+}
+.recipe-preview.city::after {
+  width: 60px;
+  height: 42px;
+  top: 34px;
+  right: 6px;
+  background: #526858;
+  transform: rotate(30deg);
+}
+.recipe-preview.desert {
+  background: linear-gradient(#e4b28f 0 52%, #ceb180 52%);
+}
+.recipe-preview.desert i {
+  background: #ae795e;
+  border: 0;
+  border-radius: 10% 10% 0 0;
+  transform: skewX(-12deg);
+  top: 28px;
+  left: 4px;
+}
+.recipe-preview.lakes {
+  background: linear-gradient(#d5e5df 0 43%, #5c9795 43% 68%, #72b7b2 68%);
+}
+.recipe-preview.lakes i {
+  background: #688376;
+  border: 0;
+  transform: rotate(42deg);
+}
+.recipe-preview.forest {
+  background: linear-gradient(#b0c1b3, #6f8b72);
+}
+.recipe-preview.forest i {
+  width: 5px;
+  left: 10px;
+  top: 0;
+  background: #655c48;
+  border: 0;
+  border-radius: 0;
+  transform: none;
+  box-shadow:
+    14px 0 #655c48,
+    27px 0 #655c48;
+}
+.recipe-preview.forest::after {
+  background: #416752;
+  width: 80px;
+  height: 28px;
+  right: -12px;
+  top: -10px;
+}
 .composer-section summary {
   cursor: pointer;
   font-size: 12px;
@@ -126,7 +191,7 @@
   min-width: 0;
 }
 .composer-field > span {
-  color: #718064;
+  color: var(--muted);
 }
 .composer-field select,
 .composer-field input {
@@ -154,7 +219,7 @@
   padding: 0;
 }
 .composer-status {
-  color: #738565;
+  color: var(--muted);
   font-size: 10px;
   line-height: 1.6;
   margin: 8px 0 28px;
@@ -168,52 +233,6 @@
 .style-preview.coastal b {
   background: #73b2b0;
 }
-/* The game's overlay stays readable at night without changing the workshop or drawer. */
-body.is-night:not(.in-garage) .site-header {
-  color: #e4ece7;
-}
-.is-night .game-shell {
-  color: #e4ece7;
-}
-.is-night .intro h1 em {
-  color: #c2d2b6;
-}
-.is-night .intro p,
-.is-night .intro-kicker,
-.is-night .route-card .eyebrow,
-.is-night .route-distance small,
-.is-night .route-note,
-.is-night .route-drawing,
-.is-night .start-note {
-  color: #c1d1cc;
-}
-.is-night .world-label {
-  border-color: #c1d1cc55;
-}
-.is-night .brand-mark {
-  background: #dce8d915;
-}
-.is-night:not(.in-garage) .sound-button {
-  color: #c1d1cc;
-}
-.is-night:not(.in-garage) .site-header .icon-button:hover,
-.is-night:not(.in-garage) .site-header .garage-nav:hover {
-  background: #dce8d922;
-}
-.is-night .thumb-hint {
-  color: #c1d1cc;
-}
 #weather-icon {
   display: flex;
-}
-.is-night .driving-guide,
-.is-night .speed-card,
-.is-night .pause-card,
-.is-night .touch-controls {
-  color: var(--ink);
-}
-@media (min-width: 651px) and (pointer: fine) {
-  .is-night .speed-card {
-    color: #e4ece7;
-  }
 }

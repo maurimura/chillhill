@@ -4,4 +4,7 @@ dist/
 .env.*
 !.env.example
 artifacts/
+.wrangler/
+.dev.vars
+.dev.vars.*
 .DS_Store

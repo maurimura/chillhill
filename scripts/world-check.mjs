@@ -107,8 +107,11 @@ export async function checkWorld(browser, origin, errors) {
   assert.match(await page.locator('#scene-status').textContent(), /has not changed/);
   await page.reload();
   await page.waitForFunction(() => window.__chillhill?.driveReady);
-  for (const [key, value] of Object.entries(selected))
-    assert.equal(await page.evaluate((key) => window.__chillhill.settings[key], key), value);
+  for (const [key, value] of Object.entries(selected)) {
+    const actual = await page.evaluate((key) => window.__chillhill.settings[key], key);
+    if (key === 'seed') assert.notEqual(actual, value, 'reload starts a fresh route');
+    else assert.equal(actual, value, 'other saved scenery preferences survive reload');
+  }
   await page.locator('#open-settings').click();
   await page.locator('#scene-name').evaluate((input) => (input.closest('details').open = true));
   assert.equal(await page.locator('#saved-scenes option').count(), 2);

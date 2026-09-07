@@ -2,18 +2,9 @@ import './garage.css';
 import { cars, type CarId } from './config/cars';
 import { styles, type Settings } from './config';
 import { GarageScene, type GarageAngle } from './game/garage';
-
-const swatches = [
-  ['Chalk', '#ece8db'],
-  ['Silver', '#a7b4b9'],
-  ['Graphite', '#414b50'],
-  ['Sage', '#87957a'],
-  ['Forest', '#426453'],
-  ['Ocean', '#537c96'],
-  ['Terracotta', '#b96f53'],
-  ['Cherry', '#943b42'],
-  ['Honey', '#ceaa60'],
-];
+import { paintSwatches as swatches } from './config/paint';
+import { vehiclePaintColor } from './game/vehicles';
+import { formatLength, resolveUnitSystem } from './config/units';
 
 export class Garage {
   private scene?: GarageScene;
@@ -23,6 +14,8 @@ export class Garage {
   private root: HTMLElement;
   private wireframe = false;
   private spin = false;
+  private compact = window.matchMedia('(max-width: 720px), (max-height: 820px)');
+  private activeTab = 'cars';
 
   constructor(
     settings: Settings,
@@ -49,7 +42,18 @@ export class Garage {
           <div id="garage-error" class="garage-error" hidden><h2>The workshop couldn’t load.</h2><p>Try reloading in a browser with WebGL 2 enabled.</p><button id="garage-retry" class="garage-drive">Try again</button></div>
         </div>
         <aside class="garage-panel" aria-label="Customize your car">
-          <div class="garage-panel-section"><span class="eyebrow">01 / YOUR RIDE</span><h2 id="garage-car-name"></h2><p id="garage-car-variant" class="garage-muted"></p><div class="garage-car-list" role="group" aria-label="Choose a garage car">${Object.entries(
+          <div class="garage-tabs" role="tablist" aria-label="Garage tools">${[
+            ['cars', 'Cars'],
+            ['paint', 'Paint'],
+            ['details', 'Details'],
+          ]
+            .map(
+              ([id, label]) =>
+                `<button id="garage-tab-${id}" role="tab" data-garage-tab="${id}" aria-controls="garage-section-${id}">${label}</button>`,
+            )
+            .join('')}</div>
+          <div class="garage-sections">
+          <div id="garage-section-cars" class="garage-panel-section"><span class="eyebrow">01 / YOUR RIDE</span><h2 id="garage-car-name"></h2><p id="garage-car-variant" class="garage-muted"></p><div class="garage-car-list" role="group" aria-label="Choose a garage car">${Object.entries(
             cars,
           )
             .map(
@@ -57,13 +61,48 @@ export class Garage {
                 `<button data-garage-car="${id}" aria-pressed="false"><span class="garage-car-number">0${index + 1}</span><span>${car.name}</span><span class="garage-selection" aria-hidden="true">↗</span></button>`,
             )
             .join('')}</div></div>
-          <div class="garage-panel-section"><span class="eyebrow">02 / A COAT OF COLOR</span><div class="garage-paint-heading"><h3>Find your shade.</h3><button id="garage-paint-reset" class="garage-text-button">Reset paint</button></div><div class="garage-swatches" role="group" aria-label="Paint colors">${swatches.map(([name, color]) => `<button data-paint="${color}" style="--swatch:${color}" title="${name}" aria-label="${name} paint" aria-pressed="false"><span aria-hidden="true">✓</span></button>`).join('')}</div><div class="garage-custom-color"><label class="garage-color-picker" for="garage-paint">Custom color<input id="garage-paint" type="color" aria-label="Custom car paint"/></label><label class="garage-hex-label" for="garage-hex"><span class="sr-only">Hex color</span><input id="garage-hex" type="text" maxlength="7" pattern="#[0-9a-fA-F]{6}" spellcheck="false" autocomplete="off" aria-label="Hex paint color"/></label></div><p id="garage-paint-note" class="garage-muted" role="status">Paint is saved separately for each car.</p></div>
-          <div class="garage-panel-section garage-detail-section"><span class="eyebrow">03 / THE LITTLE DETAILS</span><label class="garage-softness-label" for="garage-softness"><span>Shape softness</span><output id="garage-softness-value"></output></label><input id="garage-softness" type="range" min="0" max="1" step="0.05"/><div class="garage-tools"><button id="garage-wireframe" class="garage-chip" aria-pressed="false">Wireframe</button><button id="garage-reset-view" class="garage-text-button">Reset view ↺</button></div><dl class="garage-specs" id="garage-specs"></dl></div>
+          <div id="garage-section-paint" class="garage-panel-section"><span class="eyebrow">02 / A COAT OF COLOR</span><div class="garage-paint-heading"><h3>Find your shade.</h3><button id="garage-paint-reset" class="garage-text-button">Reset paint</button></div><div class="garage-swatches" role="group" aria-label="Paint colors">${swatches.map(([name, color]) => `<button data-paint="${color}" style="--swatch:${color}" title="${name}" aria-label="${name} paint" aria-pressed="false"><span aria-hidden="true">✓</span></button>`).join('')}</div><div class="garage-custom-color"><label class="garage-color-picker" for="garage-paint">Custom color<input id="garage-paint" type="color" aria-label="Custom car paint"/></label><label class="garage-hex-label" for="garage-hex"><span class="sr-only">Hex color</span><input id="garage-hex" type="text" maxlength="7" pattern="#[0-9a-fA-F]{6}" spellcheck="false" autocomplete="off" aria-label="Hex paint color"/></label></div><p id="garage-paint-note" class="garage-muted" role="status">Paint is saved separately for each car.</p></div>
+          <div id="garage-section-details" class="garage-panel-section garage-detail-section"><span class="eyebrow">03 / THE LITTLE DETAILS</span><label class="garage-softness-label" for="garage-softness"><span>Shape softness</span><output id="garage-softness-value"></output></label><input id="garage-softness" type="range" min="0" max="1" step="0.05"/><div class="garage-tools"><button id="garage-wireframe" class="garage-chip" aria-pressed="false">Wireframe</button><button id="garage-reset-view" class="garage-text-button">Reset view ↺</button></div><dl class="garage-specs" id="garage-specs"></dl></div>
+          </div>
         </aside>
       </div>
       <footer class="garage-footer"><span><i></i> Same car. A different perspective.</span><span>Changes follow you back to the hill.</span></footer>`;
     document.querySelector('#app')!.append(this.root);
     const options = { signal: this.abort.signal };
+    const tabs = [...this.root.querySelectorAll<HTMLButtonElement>('[data-garage-tab]')];
+    tabs.forEach((button, index) => {
+      button.addEventListener(
+        'click',
+        () => {
+          this.activeTab = button.dataset.garageTab!;
+          this.syncLayout();
+        },
+        options,
+      );
+      button.addEventListener(
+        'keydown',
+        (event) => {
+          const next =
+            event.key === 'ArrowRight'
+              ? (index + 1) % tabs.length
+              : event.key === 'ArrowLeft'
+                ? (index + tabs.length - 1) % tabs.length
+                : event.key === 'Home'
+                  ? 0
+                  : event.key === 'End'
+                    ? tabs.length - 1
+                    : -1;
+          if (next < 0) return;
+          event.preventDefault();
+          this.activeTab = tabs[next]!.dataset.garageTab!;
+          this.syncLayout();
+          tabs[next]!.focus();
+        },
+        options,
+      );
+    });
+    this.compact.addEventListener('change', () => this.syncLayout(true), options);
+    this.syncLayout();
     this.root.querySelectorAll<HTMLButtonElement>('[data-garage-car]').forEach((button) =>
       button.addEventListener(
         'click',
@@ -143,6 +182,37 @@ export class Garage {
   private $<T extends HTMLElement = HTMLElement>(id: string) {
     return this.root.querySelector<T>(`#${id}`)!;
   }
+  private syncLayout(preserveFocus = false) {
+    const compact = this.compact.matches;
+    const focused = document.activeElement;
+    this.root.classList.toggle('garage-compact', compact);
+    this.root.querySelector<HTMLElement>('.garage-tabs')!.hidden = !compact;
+    for (const id of ['cars', 'paint', 'details']) {
+      const panel = this.$(`garage-section-${id}`);
+      const tab = this.$<HTMLButtonElement>(`garage-tab-${id}`);
+      // Keep the focused tool available when the window changes layout.
+      if (preserveFocus && compact && focused && panel.contains(focused)) this.activeTab = id;
+      if (compact) {
+        panel.setAttribute('role', 'tabpanel');
+        panel.setAttribute('aria-labelledby', tab.id);
+      } else {
+        panel.removeAttribute('role');
+        panel.removeAttribute('aria-labelledby');
+      }
+    }
+    for (const id of ['cars', 'paint', 'details']) {
+      const panel = this.$(`garage-section-${id}`);
+      const tab = this.$<HTMLButtonElement>(`garage-tab-${id}`);
+      panel.hidden = compact && id !== this.activeTab;
+      tab.setAttribute('aria-selected', String(id === this.activeTab));
+      tab.tabIndex = id === this.activeTab ? 0 : -1;
+      if (compact && focused && panel.hidden && panel.contains(focused)) {
+        this.$(`garage-tab-${this.activeTab}`).focus();
+      } else if (!compact && focused === tab) {
+        panel.querySelector<HTMLElement>('button, input')?.focus();
+      }
+    }
+  }
   private paint(value: string | null) {
     this.onChange({ paint: { ...this.settings.paint, [this.settings.car]: value } });
   }
@@ -161,11 +231,11 @@ export class Garage {
       .forEach((button) =>
         button.setAttribute('aria-pressed', String(button.dataset.garageCar === this.settings.car)),
       );
-    const color =
-      this.settings.paint[this.settings.car] ??
-      this.scene?.paintColor ??
-      car.paint ??
-      styles[this.settings.style].car;
+    const color = vehiclePaintColor(
+      this.settings.car,
+      styles[this.settings.style].car,
+      this.settings.paint[this.settings.car],
+    );
     this.$<HTMLInputElement>('garage-paint').value = color;
     const hex = this.$<HTMLInputElement>('garage-hex');
     if (document.activeElement !== hex || /^#[\da-f]{6}$/i.test(hex.value)) {
@@ -193,7 +263,7 @@ export class Garage {
     ]
       .map(
         ([name, value]) =>
-          `<div><dt>${name}</dt><dd>${Number(value).toFixed(3)} <span>m</span></dd></div>`,
+          `<div><dt>${name}</dt><dd>${formatLength(Number(value), resolveUnitSystem(this.settings.units), true)}</dd></div>`,
       )
       .join('');
   }

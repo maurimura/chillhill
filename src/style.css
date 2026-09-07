@@ -5,10 +5,16 @@
   font-synthesis: none;
   font-weight: 400;
   --ink: #364437;
-  --muted: #858a79;
+  --muted: #58674f;
   --paper: #f5f3eb;
   --olive: #526342;
   --line: #dddfd1;
+  /* Local glass stays readable even when the scene behind it is pure white. */
+  --overlay-ink: #f5f3eb;
+  --overlay-muted: #dae1d3;
+  --overlay-accent: #c7d6b7;
+  --overlay-surface: #1e2b24d1;
+  --overlay-line: #dae1d345;
   --nav-height: 80px;
   --nav-top: env(safe-area-inset-top, 0px);
   --edge-bottom: env(safe-area-inset-bottom, 0px);
@@ -134,6 +140,7 @@ h1.nav-title {
 .brand-mark {
   width: 38px;
   height: 38px;
+  flex-shrink: 0;
   background: #e6e9db80;
   border-radius: 50%;
   display: grid;
@@ -143,6 +150,12 @@ h1.nav-title {
   width: 25px;
   height: 25px;
   stroke-width: 1.3;
+}
+/* Center the visible DM Sans lettering, not just its font's line box. */
+.brand-name,
+.world-label .eyebrow {
+  position: relative;
+  top: 0.5px;
 }
 .header-actions {
   display: flex;
@@ -195,13 +208,77 @@ h1.nav-title {
   height: 100%;
 }
 .world-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   min-width: 0;
   padding: 6px 0 6px 25px;
   border-left: 1px solid #36443726;
 }
 .world-label .eyebrow {
+  display: block;
+  line-height: 1.2;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.debug-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.debug-toggle input {
+  accent-color: #526943;
+  width: 17px;
+  height: 17px;
+}
+.collision-legend {
+  position: absolute;
+  left: 18px;
+  top: calc(var(--nav-height) + var(--nav-top) + 135px);
+  z-index: 4;
+  display: grid;
+  gap: 4px;
+  max-width: min(255px, calc(100vw - 36px));
+  padding: 12px 14px;
+  border: 1px solid var(--overlay-line);
+  border-radius: 12px;
+  background: #14231ff0;
+  color: #f5f4ea;
+  font-size: 11px;
+  line-height: 1.35;
+  pointer-events: none;
+}
+.collision-legend strong {
+  margin-bottom: 3px;
+}
+.collision-legend small {
+  margin-top: 4px;
+  font-size: 10px;
+}
+.debug-player {
+  color: #70ffb4;
+}
+.debug-traffic {
+  color: #ffbd68;
+}
+.debug-safe {
+  color: #77dfff;
+}
+.debug-limit {
+  color: #ff7488;
+}
+@media (max-height: 500px) {
+  .collision-legend {
+    top: calc(var(--nav-height) + var(--nav-top) + 62px);
+    font-size: 9px;
+    gap: 2px;
+    padding: 7px 10px;
+  }
+  .collision-legend small {
+    font-size: 8px;
+  }
 }
 .eyebrow {
   font-size: 9px;
@@ -333,6 +410,7 @@ h1 em {
 }
 .speed-card {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 12px;
   position: relative;
@@ -340,12 +418,19 @@ h1 em {
   min-width: 125px;
 }
 .speed-number {
+  /* Keep the readout still through 99 → 100; tabular digits share the 0 advance. */
+  flex: 0 0 3ch;
+  width: 3ch;
+  text-align: right;
   font-family: 'DM Sans Variable', sans-serif;
   font-size: 54px;
   font-weight: 400;
   letter-spacing: -3px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
+}
+.speed-card > div:not(.speed-track) {
+  flex: 0 0 78px;
 }
 .speed-unit {
   display: block;
@@ -432,16 +517,18 @@ kbd {
   transform: translate(-50%, -50%);
   width: min(420px, 88%);
   text-align: center;
-  background: #f6f5ebf2;
-  border: 1px solid #fff9;
+  background: var(--overlay-surface);
+  color: var(--overlay-ink);
+  border: 1px solid var(--overlay-line);
   padding: 40px 28px;
   border-radius: 15px;
+  z-index: 6;
   backdrop-filter: blur(16px);
   box-shadow: 0 18px 70px #28362320;
 }
 .pause-card .eyebrow {
   font-size: 8px;
-  color: #7e8b6d;
+  color: var(--overlay-accent);
 }
 .pause-card h2 {
   font-family: 'DM Serif Display', Georgia, serif;
@@ -453,7 +540,7 @@ kbd {
 }
 .pause-card p {
   font-size: 12px;
-  color: #7d8871;
+  color: var(--overlay-muted);
   line-height: 1.7;
 }
 .pause-card .start-button {
@@ -520,7 +607,7 @@ dialog::backdrop {
 }
 .panel-header .eyebrow {
   font-size: 7px;
-  color: #929a83;
+  color: var(--muted);
   letter-spacing: 1.6px;
 }
 .panel-header h2 {
@@ -531,7 +618,7 @@ dialog::backdrop {
   margin: 9px 0 0;
 }
 .panel-header .icon-button {
-  color: #839176;
+  color: var(--muted);
 }
 .panel-scroll {
   overflow-y: auto;
@@ -542,7 +629,7 @@ dialog::backdrop {
 }
 .panel-intro {
   font-size: 11px;
-  color: #8a927d;
+  color: var(--muted);
   margin: 20px 0 28px;
 }
 fieldset {
@@ -554,7 +641,7 @@ fieldset {
 legend {
   font-size: 8px;
   letter-spacing: 1.7px;
-  color: #88937a;
+  color: var(--muted);
   font-weight: 600;
   margin-bottom: 18px;
   padding: 0;
@@ -564,6 +651,29 @@ legend {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+.units-picker > label {
+  display: block;
+  margin-bottom: 9px;
+  font-size: 12px;
+}
+.units-picker select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+}
+.units-picker select:focus-visible {
+  outline: 2px solid #81995e;
+  outline-offset: 3px;
+}
+.units-picker .field-note {
+  margin: 10px 0 0;
 }
 .car-picker {
   display: grid;
@@ -606,7 +716,7 @@ legend {
   font-weight: 650;
 }
 .car-variant {
-  color: #737c70;
+  color: var(--muted);
   font-size: 10px;
 }
 .car-check {
@@ -708,7 +818,7 @@ legend {
 }
 .slider-label output {
   font-size: 10px;
-  color: #8e987f;
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 input[type='range'] {
@@ -756,7 +866,7 @@ input[type='range']::-moz-range-thumb {
   border: 1px solid #dce1d1;
   background: #eef0e5;
   border-radius: 5px;
-  color: #738461;
+  color: var(--muted);
   font-size: 11px;
 }
 .seed-row .icon-button {
@@ -770,7 +880,7 @@ input[type='range']::-moz-range-thumb {
 .field-note {
   font-size: 9px;
   line-height: 1.8;
-  color: #8d967e;
+  color: var(--muted);
   margin-top: -4px;
 }
 .panel-bottom {
@@ -784,14 +894,14 @@ input[type='range']::-moz-range-thumb {
   font-size: 10px;
   border: 0;
   background: transparent;
-  color: #7a8b69;
+  color: var(--muted);
 }
 .text-button:hover {
   color: #3d5730;
 }
 .saved-note {
   font-size: 8px;
-  color: #a0a791;
+  color: var(--muted);
   text-align: center;
   margin-top: 20px;
 }
@@ -979,6 +1089,9 @@ input[type='range']::-moz-range-thumb {
   .speed-status {
     font-size: 5px;
     max-width: 65px;
+  }
+  .speed-card > div:not(.speed-track) {
+    flex-basis: 65px;
   }
   .driving-guide {
     display: none;
@@ -1304,5 +1417,504 @@ input[type='range']::-moz-range-thumb {
   h1.nav-title {
     font-size: 21px;
     padding-left: 10px;
+  }
+}
+
+/* Readable local glass, not a wash over the world. These colors deliberately do
+   not follow the sky: a white cloud, snow bank, or dark tree can pass any label. */
+body:not(.in-garage) .nav-identity,
+body:not(.in-garage) .header-actions,
+.intro,
+.route-card,
+.speed-card {
+  isolation: isolate;
+  color: var(--overlay-ink);
+}
+body:not(.in-garage) .nav-identity,
+body:not(.in-garage) .header-actions,
+.route-card {
+  position: relative;
+}
+body:not(.in-garage) .nav-identity::before,
+body:not(.in-garage) .header-actions::before,
+.intro::before,
+.route-card::before,
+.speed-card::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -8px -12px;
+  border: 1px solid var(--overlay-line);
+  border-radius: 13px;
+  background: var(--overlay-surface);
+  pointer-events: none;
+}
+body:not(.in-garage) .header-actions::before {
+  inset: -4px -6px;
+}
+body:not(.in-garage) .nav-identity {
+  gap: 16px;
+  padding: 4px 16px 4px 6px;
+}
+body:not(.in-garage) .nav-identity::before {
+  inset: 0;
+}
+body:not(.in-garage) .world-label {
+  border-color: var(--overlay-line);
+  padding-inline: 16px 0;
+}
+body:not(.in-garage) .brand-mark {
+  background: #dae1d31a;
+}
+body:not(.in-garage) .site-header .sound-button {
+  color: var(--overlay-muted);
+}
+body:not(.in-garage) .site-header .icon-button:hover,
+body:not(.in-garage) .site-header .icon-button[aria-expanded='true'] {
+  background: #dae1d329;
+  box-shadow: inset 0 0 0 1px var(--overlay-line);
+}
+body:not(.in-garage) .site-header :focus-visible,
+.intro :focus-visible,
+.touch-controls :focus-visible {
+  outline-color: var(--overlay-accent);
+  outline-offset: 2px;
+}
+.intro::before {
+  inset: -24px -28px;
+  border-radius: 20px;
+}
+.intro h1 {
+  color: var(--overlay-ink);
+  text-shadow: none;
+}
+.intro h1 em,
+.intro-kicker,
+.route-drawing {
+  color: var(--overlay-accent);
+}
+.intro p,
+.start-note,
+.start-note kbd,
+.route-card .eyebrow,
+.route-distance small,
+.route-note,
+.speed-unit,
+.speed-status {
+  color: var(--overlay-muted);
+}
+.intro .start-button {
+  background: var(--overlay-accent);
+  color: #273824;
+}
+.intro .start-button:hover {
+  background: #dae6ce;
+}
+.route-drawing svg path {
+  stroke-opacity: 0.7;
+}
+.speed-status {
+  font-size: 8px;
+  letter-spacing: 0.6px;
+}
+.speed-track {
+  background: #dae1d34d;
+}
+.speed-track span {
+  background: var(--overlay-accent);
+}
+.driving-guide,
+#thumb-pad,
+.thumb-hint {
+  background: var(--overlay-surface);
+  border-color: var(--overlay-line);
+  color: var(--overlay-ink);
+}
+.keyboard-guide,
+.keyboard-guide .arrows-note {
+  color: var(--overlay-muted);
+}
+.keyboard-guide kbd {
+  color: #33452c;
+  background: #e5ebda;
+  border-color: #c7d6b7;
+}
+.thumb-hint {
+  font-size: 8px;
+  line-height: 1.4;
+  letter-spacing: 0.6px;
+  padding: 4px 3px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+}
+#thumb-pad::before,
+#thumb-pad::after {
+  background: #dae1d326;
+}
+.pad-puck {
+  background: #c7d6b733;
+  border-color: #c7d6b799;
+}
+.pressed .pad-puck {
+  background: #c7d6b7b3;
+  border-color: var(--overlay-ink);
+}
+.mode-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: min(360px, 100%);
+  margin: 0 0 18px;
+}
+.mode-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid var(--overlay-line);
+  border-radius: 9px;
+  padding: 14px 16px;
+  background: transparent;
+  text-align: left;
+  color: var(--overlay-ink);
+}
+.mode-option > span {
+  display: grid;
+  gap: 5px;
+}
+.mode-option > .icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+.mode-option strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.mode-option small {
+  font-size: 10px;
+  color: var(--overlay-muted);
+}
+.mode-option[data-current='true'] {
+  border-color: var(--overlay-accent);
+  background: #c7d6b71a;
+}
+.mode-option:hover {
+  background: #c7d6b726;
+}
+.intro .mode-option[data-current='true'] {
+  background: var(--overlay-accent);
+  color: #26372b;
+}
+.intro .mode-option[data-current='true'] small {
+  color: inherit;
+}
+.pause-card .mode-picker {
+  margin: 20px auto 0;
+}
+.pause-card .mode-option {
+  color: var(--overlay-ink);
+  border-color: var(--overlay-line);
+}
+.pause-card .mode-option small {
+  color: var(--overlay-muted);
+}
+.pause-card .mode-option[data-current='true'] {
+  background: var(--overlay-accent);
+  border-color: var(--overlay-accent);
+  color: #26372b;
+}
+.pause-card .mode-option[data-current='true'] small {
+  color: inherit;
+}
+.pause-card :focus-visible {
+  outline: 2px solid var(--overlay-accent);
+  outline-offset: 3px;
+}
+.challenge-hud,
+.challenge-message {
+  position: absolute;
+  color: var(--overlay-ink);
+  background: var(--overlay-surface);
+  border: 1px solid var(--overlay-line);
+  border-radius: 11px;
+  font-size: 11px;
+  pointer-events: none;
+}
+.challenge-hud {
+  top: calc(var(--nav-height) + var(--nav-top) + 12px);
+  left: max(24px, env(safe-area-inset-left));
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 13px;
+}
+.challenge-hud .eyebrow {
+  font-size: 8px;
+  color: var(--overlay-accent);
+}
+.challenge-hud strong {
+  font-variant-numeric: tabular-nums;
+}
+.challenge-message {
+  position: relative;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px 12px;
+  width: 100%;
+  padding: 10px 14px;
+  text-align: left;
+  line-height: 1.5;
+}
+.driving-feedback {
+  position: absolute;
+  z-index: 4;
+  /* The keyboard legend ends 61px above the bottom; leave a quiet 15px gap. */
+  bottom: calc(76px + var(--edge-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(300px, calc(100% - 32px));
+  pointer-events: none;
+}
+.feedback-sign {
+  display: grid;
+  place-items: center;
+  color: var(--overlay-accent);
+}
+.driving-sign {
+  display: block;
+  width: 38px;
+  height: 38px;
+}
+.feedback-copy {
+  display: grid;
+  gap: 3px;
+}
+.world-clock-label {
+  display: block;
+  margin-top: 5px;
+  font-size: 9px;
+  line-height: 1.5;
+  color: var(--overlay-muted);
+}
+#road-recovery-time {
+  color: var(--overlay-accent);
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+}
+.recovery-track {
+  grid-column: 1 / -1;
+  height: 4px;
+  margin-top: 2px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #c7d6b733;
+}
+.recovery-track > span {
+  display: block;
+  height: 100%;
+  background: var(--overlay-accent);
+  border-radius: inherit;
+}
+@media (max-width: 650px) {
+  body:not(.in-garage) .header-actions::before {
+    inset-inline: -3px;
+  }
+  body:not(.in-garage) .nav-identity {
+    gap: 9px;
+    padding: 4px 6px;
+  }
+  body:not(.in-garage) .world-label {
+    flex: 1;
+    padding: 0;
+  }
+  .world-label .eyebrow {
+    font-size: 8px;
+  }
+  .intro::before {
+    inset: -18px -12px;
+    border-radius: 14px;
+  }
+  .intro h1 {
+    font-size: clamp(44px, 14vw, 62px);
+    margin: 17px 0;
+  }
+  .intro p {
+    margin-bottom: 16px;
+  }
+  .mode-picker {
+    width: min(260px, 100%);
+    margin-bottom: 14px;
+  }
+  .mode-option {
+    padding: 8px 10px;
+  }
+  .route-card::before,
+  .speed-card::before {
+    inset: -6px -8px;
+    border-radius: 9px;
+  }
+  .is-driving .speed-card {
+    transform: translateY(-162px);
+    background: transparent;
+    border-color: transparent;
+  }
+  .route-card .eyebrow {
+    font-size: 8px;
+  }
+  .speed-status {
+    font-size: 7px;
+  }
+  .challenge-hud {
+    left: max(12px, env(safe-area-inset-left));
+    top: calc(var(--nav-height) + var(--nav-top) + 8px);
+    padding: 8px 10px;
+    gap: 10px;
+  }
+  .world-clock-label {
+    font-size: 8px;
+  }
+}
+@media (pointer: coarse) and (min-width: 651px) {
+  .is-driving .speed-card {
+    transform: translateY(-166px);
+  }
+}
+@media (max-width: 380px) {
+  .is-driving .speed-card {
+    transform: none;
+  }
+  .intro {
+    left: 22px;
+    top: 44%;
+  }
+  .intro h1 {
+    font-size: 44px;
+  }
+  .route-card .world-clock-label {
+    max-width: 118px;
+  }
+}
+@media (max-height: 600px) and (orientation: landscape) {
+  .intro {
+    top: 44%;
+  }
+  .intro::before {
+    inset: -8px -14px;
+  }
+  .intro h1 {
+    font-size: 46px;
+    margin: 6px 0 15px;
+  }
+  .mode-picker {
+    margin-bottom: 12px;
+    width: 240px;
+  }
+  .mode-option {
+    padding: 7px 10px;
+  }
+  .pause-card .mode-picker {
+    margin-top: 12px;
+  }
+  .challenge-hud {
+    top: calc(var(--nav-height) + var(--nav-top) + 7px);
+  }
+}
+
+@media (max-width: 650px), (pointer: coarse) {
+  .driving-feedback {
+    bottom: calc(190px + var(--edge-bottom));
+  }
+}
+@media (max-height: 600px) and (orientation: landscape) {
+  .driving-feedback {
+    bottom: calc(24px + var(--edge-bottom));
+  }
+}
+@media (max-height: 600px) and (orientation: landscape) and (pointer: coarse) {
+  .driving-feedback {
+    bottom: calc(140px + var(--edge-bottom));
+  }
+}
+@media (max-width: 380px) {
+  .challenge-message {
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 3px 8px;
+    padding: 4px 10px;
+    font-size: 10px;
+    line-height: 1.35;
+  }
+  .driving-sign {
+    width: 28px;
+    height: 28px;
+  }
+  .feedback-copy {
+    gap: 2px;
+  }
+  .recovery-track {
+    margin-top: 0;
+  }
+}
+
+/* Keep the whole car clear on touch screens, including while stopped. A small
+   speed readout shares the horizon row with lives instead of covering the tail. */
+@media (max-width: 650px), (pointer: coarse) {
+  .speed-card {
+    width: 108px;
+    min-width: 108px;
+    gap: 6px;
+  }
+  .is-driving .speed-card {
+    position: fixed;
+    top: calc(var(--nav-height) + var(--nav-top) + 8px);
+    right: max(12px, env(safe-area-inset-right));
+    bottom: auto;
+    left: auto;
+    width: 108px;
+    min-width: 108px;
+    padding: 6px 9px 9px;
+    gap: 6px;
+    transform: none;
+    background: var(--overlay-surface);
+    border: 1px solid var(--overlay-line);
+    border-radius: 9px;
+  }
+  .is-driving .speed-card::before {
+    display: none;
+  }
+  .speed-number {
+    font-size: 30px;
+    letter-spacing: -1.2px;
+  }
+  .speed-card > div:not(.speed-track) {
+    flex: 1 0 auto;
+  }
+  .speed-unit {
+    margin-top: 0;
+    font-size: 8px;
+    letter-spacing: 1px;
+  }
+  .speed-status {
+    display: none;
+  }
+  .is-driving .speed-track {
+    left: 9px;
+    right: 9px;
+    width: auto;
+    bottom: 5px;
+  }
+  .challenge-hud {
+    left: max(12px, env(safe-area-inset-left));
+    max-width: calc(
+      100% - max(12px, env(safe-area-inset-left)) - max(12px, env(safe-area-inset-right)) - 108px -
+        12px
+    );
+    font-size: 10px;
+    gap: 8px;
+  }
+  .challenge-hud > span:last-child {
+    min-width: 9ch;
   }
 }

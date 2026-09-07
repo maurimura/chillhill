@@ -20,6 +20,17 @@ const select = (key: WorldChoice, title: string) =>
     .join('')}</select></label>`;
 const range = (key: 'weatherIntensity' | 'wind', title: string) =>
   `<label class="slider-label" for="world-${key}"><span>${title}</span><output id="world-${key}-value"></output></label><input id="world-${key}" data-world-setting="${key}" type="range" min="0" max="1" step="0.05"/>`;
+const cycleToggle = (key: 'autoTime' | 'autoSeasons' | 'autoWeather', title: string) =>
+  `<label class="composer-field" for="world-${key}"><span>${title}</span><select id="world-${key}" data-world-setting="${key}"><option value="true">Let it change</option><option value="false">Keep it here</option></select></label>`;
+const cycleDuration = (
+  key: 'dayDuration' | 'seasonDays' | 'weatherDuration',
+  title: string,
+  min: number,
+  max: number,
+  step: number,
+  unit = 1,
+) =>
+  `<label class="composer-field" for="world-${key}"><span>${title}</span><input id="world-${key}" data-world-setting="${key}" data-world-unit="${unit}" type="number" min="${min}" max="${max}" step="${step}" inputmode="decimal"/></label>`;
 
 export class WorldComposer {
   private root = document.createElement('div');
@@ -45,10 +56,12 @@ export class WorldComposer {
         )
         .join('')}</fieldset>
       <div class="composer-fields">${select('landscape', 'Landscape')}${select('season', 'Season')}${select('timeOfDay', 'Time of day')}${select('weather', 'Weather')}</div>
+      <p class="quick-note" id="world-clock-summary"></p>
       <p class="quick-note" id="world-status" role="status">Mix a place, a season, a little weather. Your journey stays yours.</p>`;
     document.getElementById('world-options')!.append(this.quickRoot);
     this.root.innerHTML = `
       <details class="composer-section" open><summary>Wind & weather details</summary>${range('weatherIntensity', 'Weather intensity')}${range('wind', 'Wind & waves')}<p class="field-note">A change of mood, not grip. Braking and drifting stay just as forgiving.</p></details>
+      <details class="composer-section"><summary>The passing of time</summary><div class="composer-fields">${cycleToggle('autoTime', 'Day & night')}${cycleDuration('dayDuration', 'A day (minutes)', 1, 60, 1, 60)}${cycleToggle('autoSeasons', 'Seasons')}${cycleDuration('seasonDays', 'Days in a season', 1, 30, 1)}${cycleToggle('autoWeather', 'Weather')}${cycleDuration('weatherDuration', 'Weather interval (minutes)', 0.5, 30, 0.5, 60)}</div><p class="field-note">Daylight → sunset → moonlight → dawn, with four equal phases. Seasons follow the day clock; weather has its own rhythm. Time rests while you pause, browse a menu, or visit the garage. Picking an ingredient gives it a fresh interval.</p></details>
       <details class="composer-section"><summary>The road</summary><div class="composer-fields">${select('roadSurface', 'Surface')}${select('roadside', 'Roadside')}</div>${select('roadMarkings', 'Markings')}<p class="field-note">Keep your favorite curves and width, or adjust them in Shape the hillside below.</p></details>
       <details class="composer-section"><summary>Keep this little world</summary><label class="composer-field" for="scene-name"><span>Scene name</span><input id="scene-name" type="text" maxlength="48" value="My little escape" autocomplete="off"/></label><div class="scene-file-actions"><button id="save-scene" class="text-button">Save a copy</button><button id="export-scene" class="text-button">Export scene ↗</button><button id="import-scene" class="text-button">Import scene</button></div><input id="scene-file" type="file" accept=".json,application/json" hidden/><label class="composer-field" for="saved-scenes"><span>Saved on this device</span><select id="saved-scenes"><option value="">Choose a saved scene…</option></select></label><div class="scene-file-actions"><button id="load-scene" class="text-button" disabled>Load scene</button><button id="delete-scene" class="text-button" disabled>Remove saved copy</button></div><p class="field-note">Scenes save the scenery only. Your car, paint, handling, and journey stay yours.</p></details>
       <p class="composer-status" id="scene-status" role="status">Pick a place, then make it your own.</p>`;
@@ -60,7 +73,7 @@ export class WorldComposer {
         () => {
           const recipe = recipes[button.dataset.scene as keyof typeof recipes];
           this.$<HTMLInputElement>('scene-name').value = recipe.name;
-          this.onChange(recipe.settings as Partial<Settings>);
+          this.onChange({ ...recipe.settings, seed: this.settings.seed } as Partial<Settings>);
           this.status(`${recipe.name}. Adjust any ingredient to make a new mix.`);
         },
         options,
@@ -68,11 +81,13 @@ export class WorldComposer {
     );
     this.inputs().forEach((input) =>
       input.addEventListener(
-        'input',
+        input.type === 'number' ? 'change' : 'input',
         () => {
           this.onChange({
             [input.dataset.worldSetting!]:
-              input.type === 'range' ? Number(input.value) : input.value,
+              input.type === 'range' || input.type === 'number'
+                ? Number(input.value) * Number(input.dataset.worldUnit ?? 1)
+                : input.value,
           });
         },
         options,
@@ -232,7 +247,10 @@ export class WorldComposer {
     this.settings = settings;
     this.inputs().forEach((input) => {
       const key = input.dataset.worldSetting as keyof Settings;
-      input.value = String(settings[key]);
+      input.value =
+        input.type === 'number'
+          ? String(Number(settings[key]) / Number(input.dataset.worldUnit ?? 1))
+          : String(settings[key]);
       if (input.type === 'range') {
         this.$(`world-${key}-value`).textContent = `${Math.round(Number(settings[key]) * 100)}%`;
         input.style.setProperty('--range-progress', `${Number(settings[key]) * 100}%`);
@@ -241,11 +259,22 @@ export class WorldComposer {
     let match = '';
     this.quickRoot.querySelectorAll<HTMLButtonElement>('[data-scene]').forEach((button) => {
       const recipe = recipes[button.dataset.scene as keyof typeof recipes];
-      const selected = sceneKeys.every((key) => settings[key] === recipe.settings[key]);
+      const selected = sceneKeys.every(
+        (key) => key === 'seed' || settings[key] === recipe.settings[key],
+      );
       button.setAttribute('aria-pressed', String(selected));
       if (selected) match = recipe.name;
     });
     this.$('scene-mix').textContent = match || 'Your mix';
+    const time = settings.autoTime
+      ? `${settings.dayDuration / 60}-minute days`
+      : 'Time of day held';
+    const seasons =
+      settings.autoTime && settings.autoSeasons
+        ? `a new season every ${settings.seasonDays} ${settings.seasonDays === 1 ? 'day' : 'days'}`
+        : 'season held';
+    this.$('world-clock-summary').textContent =
+      `${time} · ${seasons}. ${settings.autoWeather ? 'Weather changes independently.' : 'Weather held.'}`;
   }
   dispose() {
     this.abort.abort();

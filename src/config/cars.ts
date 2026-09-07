@@ -1,7 +1,22 @@
+import { testarossaSpec } from './testarossa.ts';
+import { porsche911Spec } from './porsche911.ts';
+import { renault12Spec } from './renault12.ts';
+import { peugeot206 } from './peugeot206.ts';
+import { camaroSpec } from './camaro.ts';
+import { mustangSpec } from './mustang.ts';
+
 export interface CarSpec {
   name: string;
   variant: string;
-  kind: 'astra-hatch' | 'astra-sedan' | 'wagon';
+  kind:
+    | 'astra-hatch'
+    | 'wagon'
+    | 'renault-12'
+    | 'porsche-911'
+    | 'testarossa'
+    | 'peugeot-206'
+    | 'camaro-ss'
+    | 'mustang-fastback';
   length: number;
   width: number;
   mirrorWidth: number;
@@ -12,6 +27,9 @@ export interface CarSpec {
   rearTrack: number;
   tireRadius: number;
   tireWidth: number;
+  rearTireRadius?: number;
+  rearTireWidth?: number;
+  wheelStyle?: 'steel' | 'fuchs' | 'star' | 'rally' | 'styled-steel';
   paint: string | null;
 }
 
@@ -37,22 +55,11 @@ export const cars = {
     tireWidth: 0.195,
     paint: '#a7b4b9',
   },
-  'astra-sedan': {
-    name: 'Chevrolet Astra Sedan',
-    variant: '4-door sedan · 2.0',
-    kind: 'astra-sedan',
-    length: 4.342,
-    width: 1.709,
-    mirrorWidth: 1.989,
-    height: 1.425,
-    wheelbase: 2.614,
-    frontOverhang: 0.878,
-    frontTrack: 1.484,
-    rearTrack: 1.46,
-    tireRadius: 0.3075,
-    tireWidth: 0.195,
-    paint: '#778f9c',
-  },
+  'renault-12': renault12Spec,
+  testarossa: testarossaSpec,
+  'porsche-911': porsche911Spec,
+  'camaro-ss': camaroSpec,
+  'mustang-fastback': mustangSpec,
   wagon: {
     name: 'Hillside Wagon',
     variant: 'The original little adventurer',
@@ -69,6 +76,7 @@ export const cars = {
     tireWidth: 0.24,
     paint: null,
   },
+  'peugeot-206': peugeot206,
 } satisfies Record<string, CarSpec>;
 
 export type CarId = keyof typeof cars;

@@ -1,6 +1,17 @@
 import { cars, type CarId } from './cars.ts';
 
 export type CarPaints = Record<CarId, string | null>;
+export const paintSwatches = [
+  ['Chalk', '#ece8db'],
+  ['Silver', '#a7b4b9'],
+  ['Graphite', '#414b50'],
+  ['Sage', '#87957a'],
+  ['Forest', '#426453'],
+  ['Ocean', '#537c96'],
+  ['Terracotta', '#b96f53'],
+  ['Cherry', '#943b42'],
+  ['Honey', '#ceaa60'],
+] as const;
 export const emptyPaints = (): CarPaints =>
   Object.fromEntries(Object.keys(cars).map((id) => [id, null])) as CarPaints;
 

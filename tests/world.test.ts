@@ -10,6 +10,8 @@ import {
 } from '../src/config/scenes.ts';
 import { roadAt, roadElevation, seaElevation, terrainAt } from '../src/game/route.ts';
 import type { Settings } from '../src/config.ts';
+import { normalizePaints } from '../src/config/paint.ts';
+import recipes from '../src/config/scenes.json' with { type: 'json' };
 
 const settings = {
   ...worldDefaults,
@@ -24,7 +26,7 @@ const settings = {
   roundness: 0.75,
   fog: 0.25,
   car: 'astra',
-  paint: { astra: '#123456', 'astra-sedan': null, wagon: null },
+  paint: normalizePaints({ astra: '#123456' }),
   cruiseSpeed: 36,
   maxSpeed: 80,
   drift: 0.55,
@@ -32,16 +34,38 @@ const settings = {
   pixelRatio: 1,
 } satisfies Settings;
 
+test('all built-in scenery recipes are complete, valid and round-trip without car settings', () => {
+  for (const recipe of Object.values(recipes)) {
+    assert.deepEqual(Object.keys(recipe.settings).sort(), [...sceneKeys].sort());
+    const file = {
+      format: 'chillhill.scene',
+      version: 1,
+      name: recipe.name,
+      settings: recipe.settings,
+    };
+    assert.deepEqual(readScene(JSON.stringify(file)), {
+      name: recipe.name,
+      settings: recipe.settings,
+    });
+    const normalized = normalizeWorld(recipe.settings as never, worldDefaults);
+    assert.equal(normalized.landscape, recipe.settings.landscape);
+    assert.equal(normalized.weather, recipe.settings.weather);
+  }
+  assert.deepEqual(
+    ['city-afterglow', 'desert-quiet', 'alpine-lakes', 'tallwood'].map(
+      (id) => recipes[id as keyof typeof recipes].settings.landscape,
+    ),
+    ['city', 'desert', 'lakes', 'forest'],
+  );
+});
+
 test('old saves inherit independent world ingredients and invalid choices cannot overwrite them', () => {
   assert.deepEqual(normalizeWorld({}, worldDefaults), worldDefaults);
   for (const value of ['toString', '__proto__', 'ocean', 3, null, {}])
-    assert.equal(
-      normalizeWorld({ landscape: value } as never, worldDefaults).landscape,
-      'highlands',
-    );
+    assert.equal(normalizeWorld({ landscape: value } as never, worldDefaults).landscape, 'coast');
   assert.equal(
-    normalizeWorld(Object.create({ landscape: 'coast' }), worldDefaults).landscape,
-    'highlands',
+    normalizeWorld(Object.create({ landscape: 'highlands' }), worldDefaults).landscape,
+    'coast',
   );
   assert.equal(normalizeWorld({ weatherIntensity: Infinity, wind: NaN }, worldDefaults).wind, 0.25);
   assert.equal(

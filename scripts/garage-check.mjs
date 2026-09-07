@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { selectGarageTool } from './garage-tools.mjs';
 
 export async function checkGarage(browser, origin, errors) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1100 } });
@@ -25,7 +26,7 @@ export async function checkGarage(browser, origin, errors) {
   assert.equal(await page.evaluate(() => window.__chillhill.state.distance), 20);
   await page.locator('[data-paint="#426453"]').click();
   assert.equal(await page.evaluate(() => window.__chillhill.garage.paint), '#426453');
-  await page.locator('[data-garage-car="astra-sedan"]').click();
+  await page.locator('[data-garage-car="peugeot-206"]').click();
   await page.locator('#garage-hex').fill('#9C5667');
   assert.equal(await page.evaluate(() => window.__chillhill.garage.paint), '#9c5667');
   await page.locator('[data-garage-car="astra"]').click();
@@ -37,7 +38,7 @@ export async function checkGarage(browser, origin, errors) {
   await page.locator('#garage-paint-reset').click();
   assert.equal(await page.evaluate(() => window.__chillhill.settings.paint.astra), null);
   assert.equal(
-    await page.evaluate(() => window.__chillhill.settings.paint['astra-sedan']),
+    await page.evaluate(() => window.__chillhill.settings.paint['peugeot-206']),
     '#9c5667',
   );
   await page.locator('[data-paint="#426453"]').click();
@@ -79,7 +80,7 @@ export async function checkGarage(browser, origin, errors) {
   await page.waitForTimeout(200);
   const counts = new Map();
   for (let cycle = 0; cycle < 3; cycle++)
-    for (const car of ['astra-sedan', 'wagon', 'astra']) {
+    for (const car of ['peugeot-206', 'wagon', 'astra']) {
       await page.locator(`[data-garage-car="${car}"]`).click();
       await page.waitForTimeout(120);
       const { geometries, textures } = await page.evaluate(() => window.__chillhill.garage);
@@ -173,6 +174,7 @@ export async function checkGarage(browser, origin, errors) {
     await mobile.evaluate((before) => window.__chillhill.garage.distance > before, pinchDistance),
   );
   await mobile.locator('[data-garage-car="wagon"]').tap();
+  await selectGarageTool(mobile, 'paint');
   await mobile.locator('[data-paint="#ceaa60"]').tap();
   assert.equal(await mobile.evaluate(() => window.__chillhill.garage.paint), '#ceaa60');
   const stickyStage = await mobile.locator('.garage-stage').boundingBox();

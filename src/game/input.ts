@@ -17,6 +17,14 @@ export class Controls {
           event.target.closest('input, select, textarea, dialog')
         )
           return;
+        // Space activates focused toolbar buttons. Steering keys still work after
+        // a quick menu returns focus to its trigger, without requiring a mouse click.
+        if (
+          event.code === 'Space' &&
+          event.target instanceof HTMLElement &&
+          event.target.closest('button, a, [role="button"]')
+        )
+          return;
         if (
           [
             'ArrowLeft',

@@ -8,11 +8,32 @@
   },
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && tsc -p tsconfig.worker.json && vite build",
     "preview": "vite preview --host 0.0.0.0",
+    "preview:cloudflare": "wrangler dev --port 8787",
+    "deploy": "npm run build && wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply chillhill-leaderboard --local",
+    "db:migrate:remote": "wrangler d1 migrations apply chillhill-leaderboard --remote",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "test:browser": "node scripts/browser-check.mjs",
+    "test:cars": "node scripts/classic-cars-check.mjs",
     "test:world": "node scripts/world-check.mjs",
+    "test:landscapes": "node scripts/landscapes-check.mjs",
+    "test:clock": "node scripts/world-clock-check.mjs",
+    "test:challenge": "node scripts/challenge-check.mjs",
+    "test:scoreboard": "node scripts/scoreboard-check.mjs",
+    "test:speed-width": "node scripts/speed-width-check.mjs",
+    "test:online-scoreboard": "node scripts/online-scoreboard-check.mjs",
+    "test:run-leaderboard": "node scripts/run-leaderboard-check.mjs",
+    "test:cloudflare": "node scripts/cloudflare-check.mjs",
+    "test:offroad": "node scripts/offroad-check.mjs",
+    "test:hitboxes": "node scripts/hitbox-check.mjs",
+    "test:readability": "node scripts/readability-check.mjs",
+    "test:performance": "node scripts/performance-check.mjs",
+    "test:units": "node scripts/units-check.mjs",
+    "social:image": "node scripts/social-image.mjs",
+    "test:sharing": "node scripts/sharing-check.mjs",
+    "test:defaults": "node scripts/defaults-check.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
@@ -27,6 +48,7 @@
     "playwright": "^1.63.0",
     "prettier": "^3.9.6",
     "typescript": "^7.0.2",
-    "vite": "^8.2.2"
+    "vite": "^8.2.2",
+    "wrangler": "^4.129.0"
   }
 }

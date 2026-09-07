@@ -4,12 +4,14 @@ import { emptyPaints, normalizePaints, type CarPaints } from './config/paint';
 import { normalizeWorld, worldDefaults, type WorldSettings } from './config/world';
 import recipes from './config/scenes.json';
 import { readStored, storageKeys } from './config/storage';
+import { normalizeUnits, type UnitPreference } from './config/units';
 
 export type StyleId = keyof typeof palettes;
 export type Palette = (typeof palettes)[StyleId];
 export const styles = palettes;
 
 export interface Settings extends WorldSettings {
+  units: UnitPreference;
   style: StyleId;
   car: CarId;
   paint: CarPaints;
@@ -43,7 +45,7 @@ export const limits = {
   smoke: [0, 1],
   pixelRatio: [0.75, 2],
 } satisfies Record<
-  Exclude<keyof Settings, 'style' | 'car' | 'paint' | keyof WorldSettings>,
+  Exclude<keyof Settings, 'style' | 'car' | 'paint' | 'units' | keyof WorldSettings>,
   [number, number]
 >;
 
@@ -58,13 +60,15 @@ export function normalizeSettings(input: Partial<Settings>, base: Settings): Set
   result.style = input.style && Object.hasOwn(styles, input.style) ? input.style : base.style;
   result.car = input.car && Object.hasOwn(cars, input.car) ? input.car : base.car;
   result.paint = normalizePaints(input.paint, base.paint);
+  result.units = normalizeUnits(input.units, base.units);
   result.cruiseSpeed = Math.min(result.cruiseSpeed, result.maxSpeed);
   return result;
 }
 
 export const baseline: Settings = {
   ...worldDefaults,
-  style: 'alpine',
+  units: 'auto',
+  style: 'coastal',
   car: defaultCar,
   paint: emptyPaints(),
   seed: 42,
@@ -76,7 +80,7 @@ export const baseline: Settings = {
   roundness: 0.65,
   fog: 0.5,
   cruiseSpeed: 36,
-  maxSpeed: 80,
+  maxSpeed: 110,
   drift: 0.55,
   smoke: 0.65,
   pixelRatio: 1.75,
@@ -89,6 +93,7 @@ const startupScene =
     : {};
 export const defaults = normalizeSettings(
   {
+    units: env.VITE_UNITS,
     style: env.VITE_STYLE,
     landscape: env.VITE_LANDSCAPE,
     season: env.VITE_SEASON,
@@ -96,6 +101,12 @@ export const defaults = normalizeSettings(
     weather: env.VITE_WEATHER,
     weatherIntensity: env.VITE_WEATHER_INTENSITY,
     wind: env.VITE_WIND,
+    autoTime: env.VITE_AUTO_TIME,
+    autoSeasons: env.VITE_AUTO_SEASONS,
+    autoWeather: env.VITE_AUTO_WEATHER,
+    dayDuration: env.VITE_DAY_DURATION,
+    seasonDays: env.VITE_SEASON_DAYS,
+    weatherDuration: env.VITE_WEATHER_DURATION,
     roadSurface: env.VITE_ROAD_SURFACE,
     roadMarkings: env.VITE_ROAD_MARKINGS,
     roadside: env.VITE_ROADSIDE,

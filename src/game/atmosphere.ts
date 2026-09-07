@@ -7,7 +7,25 @@ const tint = (color: string, target: string, amount: number) =>
 /** Ground/vegetation respond to season; light and weather never rebuild terrain. */
 export function worldPalette(settings: Settings) {
   const palette = { ...styles[settings.style] };
-  if (settings.season === 'autumn') {
+  if (settings.landscape === 'desert') {
+    palette.ground = tint(palette.ground, '#b99265', 0.8);
+    palette.groundLight = tint(palette.groundLight, '#e1bf88', 0.8);
+    palette.mountain = tint(palette.mountain, '#b17a58', 0.8);
+    palette.rock = tint(palette.rock, '#cb9568', 0.85);
+    palette.tree = tint(palette.tree, '#758564', 0.85);
+    palette.treeLight = tint(palette.treeLight, '#a4a276', 0.7);
+    palette.shoulder = tint(palette.shoulder, '#d9b781', 0.8);
+  } else if (settings.landscape === 'forest') {
+    palette.ground = tint(palette.ground, '#5b7255', 0.65);
+    palette.groundLight = tint(palette.groundLight, '#829071', 0.6);
+    palette.trunk = tint(palette.trunk, '#6b5141', 0.65);
+  }
+  if (settings.season === 'spring') {
+    palette.tree = tint(palette.tree, '#6f9264', 0.55);
+    palette.treeLight = tint(palette.treeLight, '#c0d79b', 0.65);
+    palette.ground = tint(palette.ground, '#9ba982', 0.35);
+    palette.groundLight = tint(palette.groundLight, '#bdcba4', 0.4);
+  } else if (settings.season === 'autumn') {
     palette.tree = tint(palette.tree, '#a56d42', 0.85);
     palette.treeLight = tint(palette.treeLight, '#d0a467', 0.85);
     palette.ground = tint(palette.ground, '#ada17c', 0.5);
@@ -65,6 +83,16 @@ export function atmosphere(settings: Settings) {
       power: 0.4,
       fill: 0.8,
       elevation: 65,
+    },
+    dawn: {
+      sky: tint(palette.sky, '#d9bdd2', 0.7),
+      fog: '#c7c4d0',
+      light: '#ffd9b3',
+      ambient: '#c1cedf',
+      sun: '#ffe4be',
+      power: 1.5,
+      fill: 1.7,
+      elevation: 18,
     },
   }[settings.timeOfDay];
   const cover =
