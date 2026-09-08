@@ -61,10 +61,24 @@ jobs:
           npx --no-install wrangler d1 migrations apply chillhill-leaderboard --local --persist-to "$RUNNER_TEMP/chillhill-security-state"
           npx --no-install wrangler dev --ip 127.0.0.1 --port 8787 --persist-to "$RUNNER_TEMP/chillhill-security-state" &
           worker_pid=$!
-          trap 'kill "$worker_pid" 2>/dev/null || true' EXIT
+          api_pid=
+          cleanup() {
+            if [ -n "$api_pid" ]; then kill "$api_pid" 2>/dev/null || true; fi
+            kill "$worker_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
           curl --fail --silent --retry 20 --retry-connrefused --retry-delay 1 "$CLOUDFLARE_TEST_URL" --output /dev/null
-          npm run test:cloudflare
-          npm run test:security
+          npm run test:cloudflare &
+          api_pid=$!
+          browser_status=0
+          npm run test:security || browser_status=$?
+          api_status=0
+          wait "$api_pid" || api_status=$?
+          api_pid=
+          if [ "$api_status" -ne 0 ] || [ "$browser_status" -ne 0 ]; then
+            echo "::error::API check exit status: $api_status; browser security check exit status: $browser_status"
+            exit 1
+          fi
       - name: Keep the verified site for deployment
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

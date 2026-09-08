@@ -19,11 +19,32 @@ const testId = crypto.randomUUID();
 const nickname = `Local ${testId.slice(0, 8)}`;
 const started = performance.now();
 
+async function check(label, run) {
+  const began = performance.now();
+  try {
+    const result = await run();
+    console.log(`API PASS: ${label} (${((performance.now() - began) / 1000).toFixed(2)}s)`);
+    return result;
+  } catch (cause) {
+    throw new Error(`API FAIL: ${label}`, { cause });
+  }
+}
+async function parallel(cases) {
+  // Report every failure and finish all requests before moving to a dependent phase.
+  const results = await Promise.allSettled(cases.map(([label, run]) => check(label, run)));
+  const errors = results.filter((result) => result.status === 'rejected').map((r) => r.reason);
+  if (errors.length) throw new AggregateError(errors, 'Independent API checks failed.');
+  return results.map((result) => result.value);
+}
 async function request(path, { data, method, headers = {}, raw } = {}) {
-  const response = await fetch(new URL(path, target), {
+  const url = new URL(path, target);
+  assert.equal(url.origin, target.origin, 'Every smoke request must stay on the local preview.');
+  const response = await fetch(url, {
     method: method ?? (data === undefined && raw === undefined ? 'GET' : 'POST'),
     headers: {
       Accept: 'application/json',
+      // Local-only fixtures: separate normal API, burst and browser allowances.
+      'CF-Connecting-IP': '192.0.2.10',
       ...(data === undefined && raw === undefined
         ? {}
         : { Origin: target.origin, 'Content-Type': 'application/json' }),
@@ -41,53 +62,107 @@ async function request(path, { data, method, headers = {}, raw } = {}) {
 }
 async function api(path, options = {}, status = 200) {
   const response = await request(path, options);
-  assert.equal(response.status, status, `${options.method ?? 'request'} ${path}`);
+  return readAPI(response, path, status);
+}
+async function readAPI(response, path, status = 200) {
+  const expected = Array.isArray(status) ? status : [status];
+  assert.ok(
+    expected.includes(response.status),
+    `${path}: expected ${expected}, got ${response.status}`,
+  );
   assert.match(response.headers.get('content-type') ?? '', /application\/json/);
   assert.equal(response.headers.get('cache-control'), 'no-store');
+  assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(response.headers.get('x-frame-options'), 'DENY');
+  assert.match(response.headers.get('content-security-policy') ?? '', /default-src 'none'/);
+  assert.equal(response.headers.get('access-control-allow-origin'), null);
+  if (response.status === 429) assert.equal(response.headers.get('retry-after'), '60');
   const body = await response.json();
-  if (status >= 400) {
+  if (response.status >= 400) {
+    assert.deepEqual(Object.keys(body), ['error']);
     assert.equal(typeof body.error, 'string');
     assert.equal(/D1_ERROR|SQLITE|token_hash|SELECT |INSERT /i.test(body.error), false);
   }
   return body;
 }
-const html = await request('/', { headers: { Accept: 'text/html' } });
-assert.equal(html.status, 200);
-assert.match(html.headers.get('content-type') ?? '', /text\/html/);
-assert.match(html.headers.get('content-security-policy') ?? '', /script-src 'self'/);
-assert.equal(html.headers.get('x-frame-options'), 'DENY');
-assert.equal(html.headers.get('x-content-type-options'), 'nosniff');
-const markup = await html.text();
-assert.match(markup, /chillhill/i);
-const script = /<script[^>]+src="([^"]+)"/.exec(markup)?.[1];
-assert.ok(script, 'Built game entry point is linked.');
-assert.equal((await request(script)).status, 200, 'Built JavaScript is served.');
-await api('/api/not-a-real-route', {}, 404);
-await api('/api/runs', {}, 405);
-const before = await api('/api/leaderboard');
-assert.equal(Object.hasOwn(before, 'version'), false);
-assert.ok(
-  before.entries.length < 10,
-  'Use an isolated local D1 state directory; its test board is full.',
-);
+const [, before] = await parallel([
+  [
+    'built assets and security headers',
+    async () => {
+      const html = await request('/', { headers: { Accept: 'text/html' } });
+      assert.equal(html.status, 200);
+      assert.match(html.headers.get('content-type') ?? '', /text\/html/);
+      assert.match(html.headers.get('content-security-policy') ?? '', /script-src 'self'/);
+      assert.equal(html.headers.get('x-frame-options'), 'DENY');
+      assert.equal(html.headers.get('x-content-type-options'), 'nosniff');
+      const markup = await html.text();
+      assert.match(markup, /chillhill/i);
+      const script = /<script[^>]+src="([^"]+)"/.exec(markup)?.[1];
+      assert.ok(script, 'Built game entry point is linked.');
+      const built = await request(script);
+      assert.equal(built.status, 200, 'Built JavaScript is served.');
+      await built.arrayBuffer();
+    },
+  ],
+  [
+    'initial public board',
+    async () => {
+      const board = await api('/api/leaderboard');
+      assert.deepEqual(Object.keys(board), ['entries']);
+      assert.ok(
+        Array.isArray(board.entries) && board.entries.length < 10,
+        'Use an isolated local D1 state directory; its test board is full.',
+      );
+      return board;
+    },
+  ],
+  [
+    'country preferences expose only a country code',
+    async () => {
+      const preferences = await api('/api/preferences');
+      assert.deepEqual(Object.keys(preferences), ['country']);
+      assert.ok(preferences.country === null || /^[A-Z]{2}$/.test(preferences.country));
+    },
+  ],
+]);
 
 const settings = { version: scoringDefaults.version, car: 'astra', seed: 42, category: 'standard' };
-await api('/api/runs', { data: settings, headers: { Origin: 'https://example.invalid' } }, 403);
-await api('/api/runs', { data: { ...settings, car: 'constructor' } }, 400);
-await api('/api/runs', { raw: '{not json}' }, 400);
-await api('/api/runs', { raw: JSON.stringify({ text: 'x'.repeat(9000) }) }, 413);
-const session = await api('/api/runs', { data: settings }, 201);
+const session = await check('create a run', () => api('/api/runs', { data: settings }, 201));
 assert.match(session.token, /^[a-f0-9]{64}$/);
 assert.ok(Date.parse(session.expiresAt) > Date.now());
+const readyAt = performance.now() + 1050;
+await parallel([
+  ['unknown route', () => api('/api/not-a-real-route', {}, 404)],
+  ['run method', () => api('/api/runs', {}, 405)],
+  ['preferences method', () => api('/api/preferences', { method: 'POST' }, 405)],
+  [
+    'foreign origin',
+    () => api('/api/runs', { data: settings, headers: { Origin: 'https://example.invalid' } }, 403),
+  ],
+  [
+    'cross-site request',
+    () => api('/api/runs', { data: settings, headers: { 'Sec-Fetch-Site': 'cross-site' } }, 403),
+  ],
+  [
+    'wrong content type',
+    () => api('/api/runs', { data: settings, headers: { 'Content-Type': 'text/plain' } }, 415),
+  ],
+  ['invalid car', () => api('/api/runs', { data: { ...settings, car: 'constructor' } }, 400)],
+  ['malformed JSON', () => api('/api/runs', { raw: '{not json}' }, 400)],
+  ['non-object JSON', () => api('/api/runs', { raw: '[]' }, 400)],
+  [
+    'oversized body',
+    () => api('/api/runs', { raw: JSON.stringify({ text: 'x'.repeat(9000) }) }, 413),
+  ],
+]);
 await api(
   `/api/runs/${session.runId}/name`,
   { data: { token: session.token, name: nickname } },
   409,
 );
 
-// A plausible one-second fixture; wait in real wall time instead of inventing
-// a many-minute run that a real Worker correctly refuses to rank.
-await new Promise((resolve) => setTimeout(resolve, 1050));
+// Validation runs during the fixture's real one-second lifetime.
+await new Promise((resolve) => setTimeout(resolve, Math.max(0, readyAt - performance.now())));
 const record = {
   id: testId,
   version: scoringDefaults.version,
@@ -115,47 +190,127 @@ const record = {
 };
 const finish = `/api/runs/${session.runId}/finish`;
 const name = `/api/runs/${session.runId}/name`;
-await api(finish, { data: { token: '0'.repeat(64), record } }, 401);
-const qualification = await api(finish, { data: { token: session.token, record } });
+await parallel([
+  [
+    'finish rejects a bad token',
+    () => api(finish, { data: { token: '0'.repeat(64), record } }, 401),
+  ],
+  [
+    'name rejects a bad token',
+    () => api(name, { data: { token: '0'.repeat(64), name: nickname } }, 401),
+  ],
+  [
+    'inconsistent score is rejected',
+    () => api(finish, { data: { token: session.token, record: { ...record, score: 71 } } }, 400),
+  ],
+]);
+const [qualification, duplicateFinish] = await parallel([
+  ['finish request', () => api(finish, { data: { token: session.token, record } })],
+  ['simultaneous finish retry', () => api(finish, { data: { token: session.token, record } })],
+]);
 assert.equal(qualification.qualified, true);
 assert.ok(qualification.rank >= 1 && qualification.rank <= 10);
+assert.deepEqual(duplicateFinish, qualification);
 assert.deepEqual(await api(finish, { data: { token: session.token, record } }), qualification);
-await api(
-  finish,
-  { data: { token: session.token, record: { ...record, score: 71, earned: 71, driftEarned: 21 } } },
-  409,
-);
-await api(name, { data: { token: session.token, name: '<script>' } }, 400);
-const published = await api(name, { data: { token: session.token, name: nickname } });
+await parallel([
+  [
+    'finished scores are immutable',
+    () =>
+      api(
+        finish,
+        {
+          data: {
+            token: session.token,
+            record: { ...record, score: 71, earned: 71, driftEarned: 21 },
+          },
+        },
+        409,
+      ),
+  ],
+  [
+    'unsafe name is rejected',
+    () => api(name, { data: { token: session.token, name: '<script>' } }, 400),
+  ],
+  [
+    'unnamed runs stay private',
+    async () => assert.deepEqual(await api('/api/leaderboard'), before),
+  ],
+]);
+const [published, duplicateName] = await parallel([
+  ['publish name', () => api(name, { data: { token: session.token, name: nickname } })],
+  ['simultaneous name retry', () => api(name, { data: { token: session.token, name: nickname } })],
+]);
 assert.equal(published.qualified, true);
+assert.deepEqual(duplicateName, published);
 assert.deepEqual(await api(name, { data: { token: session.token, name: nickname } }), published);
 await api(name, { data: { token: session.token, name: 'Other local name' } }, 409);
 
 const after = await api('/api/leaderboard');
 const entry = after.entries.find((entry) => entry.record.id === testId);
+assert.equal(after.entries.filter((entry) => entry.record.id === testId).length, 1);
+assert.equal(after.entries.length, before.entries.length + 1, 'Retries publish exactly one entry.');
+assert.deepEqual(Object.keys(entry).sort(), ['name', 'record']);
+assert.deepEqual(Object.keys(entry.record).sort(), Object.keys(record).sort());
 assert.equal(entry?.name, nickname);
 assert.equal(entry?.record.score, 70);
 assert.ok(after.entries.length <= 10);
 assert.equal(JSON.stringify(after).includes(session.token), false);
 assert.equal(JSON.stringify(after).includes('token_hash'), false);
-const legacy = await api('/api/leaderboard?category=custom');
-assert.deepEqual(legacy, after, 'Legacy category links use the same combined board.');
-let limited = false;
-for (let attempt = 0; attempt < 65; attempt++) {
-  const response = await request(`/api/leaderboard?category=standard&nonce=${attempt}`);
-  if (response.status === 429) {
-    assert.equal(response.headers.get('retry-after'), '60');
-    limited = true;
-    break;
-  }
-  assert.equal(response.status, 200);
-}
-assert.ok(
-  limited,
-  'The real edge binding limits leaderboard reads despite changing query strings.',
+await parallel(
+  ['category=custom', 'category=standard', 'version=1'].map((query) => [
+    `legacy board query: ${query}`,
+    async () => assert.deepEqual(await api(`/api/leaderboard?${query}`), after),
+  ]),
 );
-assert.equal((await request('/')).status, 200, 'API throttling leaves the game available.');
-await api('/api/preferences');
+await check('bounded parallel bursts are throttled without affecting other clients', async () => {
+  const burstHeaders = { 'CF-Connecting-IP': '192.0.2.11' };
+  // An already exhausted fixture must not make a broken limiter appear to pass.
+  await api('/api/leaderboard', { headers: burstHeaders });
+  let limited = false;
+  // At most eight requests in flight; the probe has its own local-only identity.
+  for (let offset = 0; offset < 65 && !limited; offset += 8) {
+    const results = await Promise.allSettled(
+      Array.from({ length: Math.min(8, 65 - offset) }, async (_, index) => {
+        const attempt = offset + index;
+        const path = `/api/leaderboard?category=${attempt % 2 ? 'custom' : 'standard'}&nonce=${attempt}`;
+        const response = await request(path, {
+          headers: { ...burstHeaders, 'X-Forwarded-For': `198.51.100.${attempt + 1}` },
+        });
+        await readAPI(response, path, [200, 429]);
+        return response.status;
+      }),
+    );
+    const failures = results.filter((r) => r.status === 'rejected').map((r) => r.reason);
+    if (failures.length) throw new AggregateError(failures, 'Rate-limit burst failed.');
+    limited = results.some((r) => r.value === 429);
+  }
+  assert.ok(
+    limited,
+    'The real edge binding limits reads despite query and forwarding-header changes.',
+  );
+  await parallel([
+    [
+      'burst client remains throttled',
+      () => api('/api/leaderboard', { headers: burstHeaders }, 429),
+    ],
+    [
+      'other API clients can still read',
+      async () => assert.deepEqual(await api('/api/leaderboard'), after),
+    ],
+    [
+      'throttled client can still load the game',
+      async () => {
+        const response = await request('/', { headers: burstHeaders });
+        assert.equal(response.status, 200);
+        await response.text();
+      },
+    ],
+    [
+      'throttled client can still read preferences',
+      () => api('/api/preferences', { headers: burstHeaders }),
+    ],
+  ]);
+});
 console.log(
   `Cloudflare local smoke passed: assets, D1 ranking, name entry, retries, invalid requests and edge rate limits (${((performance.now() - started) / 1000).toFixed(1)}s).`,
 );

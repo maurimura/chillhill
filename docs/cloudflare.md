@@ -38,6 +38,15 @@ against disposable local D1 state. Weekly npm Dependabot updates keep applicatio
 and build dependencies under review. See [the security review](security-review.md)
 for findings, remaining limitations, and repository settings.
 
+The local API and browser security suites run concurrently, and either failure
+blocks deployment. Local fixture addresses keep their rate-limit allowances separate.
+Within `test:cloudflare`, independent validation/read checks run in parallel; the
+start, finish and naming phases remain ordered. Simultaneous finish/name retries
+must publish exactly one entry. The rate-limit probe sends bounded batches of
+eight and verifies that other clients, game assets and preferences remain available.
+Named API checks report their own timings and collect all failures in each batch.
+The browser security suite does not export or download videos.
+
 References: [Cloudflare GitHub Actions setup](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/),
 [GitHub workflow security](https://docs.github.com/en/actions/reference/security/secure-use).
 
