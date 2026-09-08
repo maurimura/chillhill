@@ -6,6 +6,12 @@ import recipes from './config/scenes.json';
 import { readStored, storageKeys } from './config/storage';
 import { normalizeUnits, type UnitPreference } from './config/units';
 import { maxDrivingSpeed } from './config/scoring';
+import {
+  curveLengthLimits,
+  defaultCurveLength,
+  curveMixLimits,
+  defaultCurveMix,
+} from './config/road-shape';
 
 export type StyleId = keyof typeof palettes;
 export type Palette = (typeof palettes)[StyleId];
@@ -18,6 +24,8 @@ export interface Settings extends WorldSettings {
   paint: CarPaints;
   seed: number;
   curves: number;
+  curveLength: number;
+  curveMix: number;
   roadWidth: number;
   grade: number;
   terrainHeight: number;
@@ -34,6 +42,8 @@ export interface Settings extends WorldSettings {
 export const limits = {
   seed: [1, 99999],
   curves: [0.2, 1.7],
+  curveLength: curveLengthLimits,
+  curveMix: curveMixLimits,
   roadWidth: [7, 16],
   grade: [0.03, 0.16],
   terrainHeight: [0.25, 2],
@@ -74,6 +84,8 @@ export const baseline: Settings = {
   paint: emptyPaints(),
   seed: 42,
   curves: 1,
+  curveLength: defaultCurveLength,
+  curveMix: defaultCurveMix,
   roadWidth: 10,
   grade: 0.09,
   terrainHeight: 1,
@@ -114,6 +126,8 @@ export const defaults = normalizeSettings(
     car: env.VITE_CAR,
     seed: env.VITE_WORLD_SEED,
     curves: env.VITE_ROAD_CURVES,
+    curveLength: env.VITE_CURVE_LENGTH,
+    curveMix: env.VITE_CURVE_MIX,
     roadWidth: env.VITE_ROAD_WIDTH,
     grade: env.VITE_HILL_GRADE,
     terrainHeight: env.VITE_TERRAIN_HEIGHT,

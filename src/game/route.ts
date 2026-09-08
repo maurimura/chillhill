@@ -1,50 +1,76 @@
 import { roadSupportWidth } from '../config/road.ts';
+import { SeededSpline } from './route-spline.ts';
+import { normalizedCurveLength, normalizedCurveMix } from '../config/road-shape.ts';
+import { roadStretchAt, stretchSlopeBound } from './road-stretches.ts';
 
 export interface RouteSettings {
   curves: number;
+  curveLength?: number;
+  curveMix?: number;
   grade: number;
   roadWidth: number;
   terrainHeight: number;
   seed: number;
   landscape?: 'highlands' | 'coast' | 'city' | 'desert' | 'lakes' | 'forest';
 }
-// Each new interval contributes a seeded bend. Quintic interpolation keeps
-// position, direction, and curvature continuous at generation boundaries.
-function bendValue(index: number, seed: number) {
-  let value = Math.imul(index ^ Math.imul(seed, 374761393), 668265263);
-  value = Math.imul(value ^ (value >>> 13), 1274126177);
-  return ((value ^ (value >>> 16)) >>> 0) / 4294967296 - 0.5;
+export const routeChunkLength = 180;
+// Slow lateral wandering prevents stretch joins from returning to a fixed center.
+// Local 90 m wiggles are gone: whole planned stretches own the turning direction.
+const wander = new SeededSpline(4860, 0x714c8e29);
+const slopes = new SeededSpline(routeChunkLength * 2, 0x4b17a6d3);
+const wanderAmplitude = 90;
+const slopeVariation = 0.22;
+
+/** Sum of the analytic stretch and slow-wander derivative bounds.
+ * Used by lake placement to protect the continuous road, not just mesh samples.
+ */
+export function roadSlopeBound(settings: Pick<RouteSettings, 'curves'>) {
+  return Math.abs(settings.curves) * (stretchSlopeBound + (2 * wanderAmplitude) / wander.spacing);
 }
 
 export function roadElevation(s: number, settings: RouteSettings) {
-  return -s * settings.grade + 1.6 * Math.sin(s / 130);
+  return (
+    -s * settings.grade +
+    settings.grade * slopes.spacing * slopeVariation * slopes.at(s, settings.seed)
+  );
 }
 
 export function roadAt(s: number, settings: RouteSettings) {
-  const phase = (settings.seed % 17) * 0.13;
-  const interval = 620;
-  const index = Math.floor(s / interval),
-    t = s / interval - index;
-  const a = bendValue(index, settings.seed),
-    difference = bendValue(index + 1, settings.seed) - a;
-  const blend = t * t * t * (t * (t * 6 - 15) + 10);
-  const blendSlope = 30 * t * t * (t - 1) * (t - 1);
-  const blendCurve = 60 * t * (2 * t * t - 3 * t + 1);
+  const scale = normalizedCurveLength(settings.curveLength);
+  const distance = s / scale;
+  const stretch = roadStretchAt(s, settings.seed, settings.curveMix, scale);
+  const u = Math.max(0, Math.min(1, (s - stretch.start) / stretch.length));
+  const v = u * (1 - u);
+  // A compact, asymmetric curve. Value and both derivatives vanish at its ends,
+  // so transitions remain C2. The central arc turns one way for several chunks;
+  // the entry/exit ease into that turn without superimposed short noise.
+  const f = 64 * v * v * v;
+  const df = 192 * v * v * (1 - 2 * u);
+  const ddf = 384 * v * (1 - 5 * v);
+  // Opposite S-curve lobes share a continuous center tangent. This is a distinct
+  // road section, never an extra oscillation interrupting a long sweep.
+  const t = 2 * u - 1;
+  const shape = stretch.kind === 's-curve' ? 2 * f * t : f;
+  const dShape = stretch.kind === 's-curve' ? 2 * (df * t + 2 * f) : df;
+  const ddShape = stretch.kind === 's-curve' ? 2 * (ddf * t + 4 * df) : ddf;
+  const asymmetry = 1 + stretch.skew * (2 * u - 1);
+  const amplitude = stretch.strength * stretch.length;
   const x =
     settings.curves *
-    (32 * Math.sin(s / 92 + phase) + 13 * Math.sin(s / 43) + 65 * (a + difference * blend));
+    (scale * wanderAmplitude * wander.at(distance, settings.seed) + amplitude * shape * asymmetry);
   const dx =
     settings.curves *
-    ((32 / 92) * Math.cos(s / 92 + phase) +
-      (13 / 43) * Math.cos(s / 43) +
-      (65 * difference * blendSlope) / interval);
+    (wanderAmplitude * wander.at(distance, settings.seed, 1) +
+      stretch.strength * (dShape * asymmetry + 2 * stretch.skew * shape));
   const ddx =
     settings.curves *
-    ((-32 / (92 * 92)) * Math.sin(s / 92 + phase) -
-      (13 / (43 * 43)) * Math.sin(s / 43) +
-      (65 * difference * blendCurve) / (interval * interval));
+    ((wanderAmplitude / scale) * wander.at(distance, settings.seed, 2) +
+      (stretch.strength / stretch.length) * (ddShape * asymmetry + 4 * stretch.skew * dShape));
   const y = roadElevation(s, settings);
-  const dy = -settings.grade + (1.6 / 130) * Math.cos(s / 130);
+  // |slope variation| <= 44% of grade, so even the gentlest setting is downhill.
+  const dy =
+    -settings.grade +
+    settings.grade * slopes.spacing * slopeVariation * slopes.at(s, settings.seed, 1);
   return {
     x,
     y,
@@ -145,7 +171,7 @@ const lakeCache = new Map<string, LakeDescriptor>();
 /** Stable finite alpine basin. Its water is level even on the steepest road. */
 export function lakeAt(index: number, settings: RouteSettings): LakeDescriptor {
   index = Math.trunc(index);
-  const key = `${settings.seed}:${settings.curves}:${settings.grade}:${settings.roadWidth}:${settings.terrainHeight}:${index}`;
+  const key = `${settings.seed}:${settings.curves}:${normalizedCurveLength(settings.curveLength)}:${normalizedCurveMix(settings.curveMix)}:${settings.grade}:${settings.roadWidth}:${settings.terrainHeight}:${index}`;
   const existing = lakeCache.get(key);
   if (existing) return existing;
   const rng = random(Math.imul(index + 1, 19349663) ^ Math.imul(settings.seed, 73856093));
@@ -155,11 +181,11 @@ export function lakeAt(index: number, settings: RouteSettings): LakeDescriptor {
   const extent = radiusZ * lakeBasinScale;
 
   // Bound the continuous road between samples using the analytic maximum of
-  // |dx/ds| (including the seeded quintic bend). This is a real clearance bound,
+  // |dx/ds| across planned stretches and wandering. This is a real clearance bound,
   // rather than hoping that no sharp curve falls between sampled positions.
   const segments = 16;
   const step = (extent * 2) / segments;
-  const derivativeBound = Math.abs(settings.curves) * (32 / 92 + 13 / 43 + (65 * 1.875) / 620);
+  const derivativeBound = roadSlopeBound(settings);
   let maxRoadX = -Infinity;
   for (let part = 0; part <= segments; part++) {
     maxRoadX = Math.max(maxRoadX, roadAt(centerDistance - extent + part * step, settings).x);

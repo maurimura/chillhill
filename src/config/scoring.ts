@@ -1,9 +1,11 @@
+import { defaultCurveLength, defaultCurveMix } from './road-shape.ts';
+
 /** Absolute configurable speed ceiling, in km/h; also enforced by the API. */
 export const maxDrivingSpeed = 280;
 
-/** Bump the rules version when changing ranked scoring or challenge physics. */
+/** Version records the game's scoring history; it never separates rankings. */
 export const scoringDefaults = Object.freeze({
-  version: 4,
+  version: 6,
   nearMissPoints: 100,
   speedReference: 60, // km/h; independent of display units or a custom speed cap
   speedMinMultiplier: 0.5,
@@ -31,17 +33,29 @@ export type ScoringConfig = { [K in keyof typeof scoringDefaults]: number };
  * units, paint, and the starting car/seed do not affect this classification. */
 export const standardDriving = Object.freeze({
   curves: 1,
+  curveLength: defaultCurveLength,
+  curveMix: defaultCurveMix,
   roadWidth: 10,
   grade: 0.09,
   maxSpeed: maxDrivingSpeed,
   drift: 0.55,
 });
-export type ScoredSettings = { [K in keyof typeof standardDriving]: number } & {
+export type ScoredSettings = {
+  [K in Exclude<keyof typeof standardDriving, 'curveLength' | 'curveMix'>]: number;
+} & {
+  curveLength?: number;
+  curveMix?: number;
   seed: number;
   car?: string;
 };
+export function scoredSetting(settings: ScoredSettings, key: keyof typeof standardDriving) {
+  return (
+    settings[key] ??
+    (key === 'curveLength' ? defaultCurveLength : key === 'curveMix' ? defaultCurveMix : NaN)
+  );
+}
 export function isStandardDriving(settings: ScoredSettings) {
   return (Object.keys(standardDriving) as (keyof typeof standardDriving)[]).every(
-    (key) => Math.abs(settings[key] - standardDriving[key]) < 1e-9,
+    (key) => Math.abs(scoredSetting(settings, key) - standardDriving[key]) < 1e-9,
   );
 }

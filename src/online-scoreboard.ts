@@ -1,10 +1,5 @@
 import { scoringDefaults } from './config/scoring.ts';
-import {
-  validScoreRecord,
-  type ScoreCategory,
-  type ScoreRecord,
-  type ScoreRun,
-} from './scoreboard.ts';
+import { validScoreRecord, type ScoreRecord, type ScoreRun } from './scoreboard.ts';
 import type { LeaderboardResponse, RankResponse, StartRunResponse } from './leaderboard-api.ts';
 
 export interface OnlineResult {
@@ -30,7 +25,6 @@ export class OnlineScoreboard {
   private record: ScoreRecord | null = null;
   private generation = 0;
   private listGeneration = 0;
-  private listedCategory: ScoreCategory = 'standard';
   private request: Requester;
 
   constructor(
@@ -90,7 +84,6 @@ export class OnlineScoreboard {
     if (this.runId === run.id) return;
     this.reset();
     this.runId = run.id;
-    this.listedCategory = run.category;
     if (!this.enabled) return;
     this.session = this.json<StartRunResponse>('runs', {
       version: scoringDefaults.version,
@@ -180,7 +173,7 @@ export class OnlineScoreboard {
           ? 'Your name is on the board.'
           : 'Another driver moved ahead. Your personal record is still saved.',
       };
-      void this.refresh(this.listedCategory);
+      void this.refresh();
     } catch (error) {
       if (generation !== this.generation || !this.result) return;
       this.result = {
@@ -191,8 +184,7 @@ export class OnlineScoreboard {
     }
     this.changed();
   }
-  async refresh(category: ScoreCategory) {
-    this.listedCategory = category;
+  async refresh() {
     const generation = ++this.listGeneration;
     this.entries = [];
     this.error = '';
@@ -205,21 +197,13 @@ export class OnlineScoreboard {
     this.loading = true;
     this.changed();
     try {
-      const data = await this.json<LeaderboardResponse>(`leaderboard?category=${category}`);
+      const data = await this.json<LeaderboardResponse>('leaderboard');
       if (generation !== this.listGeneration) return;
-      if (
-        data.version !== scoringDefaults.version ||
-        data.category !== category ||
-        !Array.isArray(data.entries) ||
-        data.entries.length > 10
-      )
+      if (!data || !Array.isArray(data.entries) || data.entries.length > 10)
         throw new Error('The leaderboard returned an incompatible response.');
       this.entries = data.entries.flatMap((entry) => {
         const record = validScoreRecord(entry.record);
-        return record &&
-          record.category === category &&
-          typeof entry.name === 'string' &&
-          entry.name.length <= 40
+        return record && typeof entry.name === 'string' && entry.name.length <= 40
           ? [{ name: entry.name, record }]
           : [];
       });

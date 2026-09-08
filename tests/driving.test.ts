@@ -185,7 +185,7 @@ test('the same seed recreates scenery; a different seed changes it', () => {
 
 test('generated bends join with continuous position, direction and curvature at any distance', () => {
   const world = { curves: 1.7, grade: 0.09, roadWidth: 10, terrainHeight: 1, seed: 42 };
-  for (const boundary of [620, 2480, 6200, 620000, 6200000]) {
+  for (const boundary of [90, 180, 360, 630, 1260, 180000, 6300000]) {
     const before = roadAt(boundary - 0.0001, world);
     const after = roadAt(boundary + 0.0001, world);
     assert.ok(Math.abs(after.x - before.x) < 0.001);

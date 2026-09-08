@@ -15,6 +15,8 @@ import {
   type StyleId,
 } from './config';
 import { GameScene } from './game/scene';
+import { ReplayRecorder } from './game/replay';
+import { ReplayView } from './replay-view';
 import { initialState, roadOffsetLimit, stepDriving } from './game/driving';
 import { roadAt } from './game/route';
 import { Controls } from './game/input';
@@ -28,6 +30,7 @@ import { FocusScope } from './focus-scope';
 import { CarMenu } from './car-menu';
 import { MusicPlayer } from './music';
 import { freshRouteSeed } from './config/route-seed';
+import { curveMixLabel } from './config/road-shape';
 import { initialChallenge, stepChallenge } from './game/challenge';
 import { challengeDefaults } from './config/challenge';
 import { driftMultiplier, resetScoreEncounter, streakMultiplier } from './game/scoring';
@@ -71,6 +74,8 @@ const icons = {
   arrow: '<path d="M4 12h15m-6-6 6 6-6 6"/>',
   pause: '<path d="M8 5v14M16 5v14"/>',
   play: '<path d="m8 5 11 7-11 7V5Z"/>',
+  clapperboard:
+    '<path d="M3 11h18v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8ZM3 11 2 6l18-4 1 5-18 4ZM7 5l3 4m4-5.5 3 4"/>',
   reset: '<path d="M3 11a9 9 0 1 1 2 7M3 4v7h7"/>',
   close: '<path d="m6 6 12 12M6 18 18 6"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 1v2m0 18v2M1 12h2m18 0h2M4 4l2 2m12 12 2 2M4 20l2-2M18 6l2-2"/>',
@@ -108,7 +113,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
     <div class="nav-identity"><a class="brand" href="#drive" aria-label="chillhill home"><span class="brand-mark">${icon('hill')}</span><span class="brand-name">chillhill</span></a><span class="world-label" id="world-label"><span class="eyebrow" id="place"></span></span><h1 class="nav-title" id="garage-title" hidden>The garage<span>.</span></h1></div>
     <div class="header-actions">
       <a class="garage-nav back-drive" id="back-drive" href="#drive" aria-label="Back to the hillside" title="Back to the hillside" hidden>${icon('arrow')}<span>Back to the hillside</span></a>
-      <div class="drive-toolbar" id="drive-toolbar" role="group" aria-label="Drive controls" hidden><button class="icon-button" id="pause" aria-label="Pause drive" title="Pause · Esc">${icon('pause')}</button><button class="icon-button" id="restart" aria-label="Restart drive" title="Back to the top · R">${icon('reset')}</button></div>
+      <div class="drive-toolbar" id="drive-toolbar" role="group" aria-label="Drive controls" hidden><button class="icon-button" id="pause" aria-label="Pause drive" title="Pause · Esc">${icon('pause')}</button><button class="icon-button" id="open-replay-toolbar" aria-label="Replay & save video" aria-haspopup="dialog" aria-controls="replay-view" title="Replay & save video">${icon('clapperboard')}</button><button class="icon-button" id="restart" aria-label="Restart drive" title="Back to the top · R">${icon('reset')}</button></div>
       <button class="icon-button" id="open-car-menu" data-quick-menu="car-menu" aria-label="Choose your car" aria-haspopup="dialog" aria-controls="car-menu" aria-expanded="false" title="Choose your car">${icon('car')}</button>
       <button class="icon-button" id="open-world-menu" data-quick-menu="world-menu" aria-label="Landscape & weather" aria-haspopup="dialog" aria-controls="world-menu" aria-expanded="false" title="Landscape & weather"><span id="weather-icon">${icon('sun')}</span></button>
       <button class="icon-button sound-button" id="sound" data-quick-menu="music-menu" aria-label="Music & ambience" aria-haspopup="dialog" aria-controls="music-menu" aria-expanded="false" title="Music & ambience">${icon('sound')}<span class="sound-slash"></span></button>
@@ -160,7 +165,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       )
       .join('')}</fieldset>
     <fieldset><legend>SOFTEN THE EDGES</legend>${slider('roundness', 'Shape softness', 0, 1, 0.05)}<p class="field-note">From angular low poly to soft, rounded shapes. Changes the car, trees, rocks, mountains, and terrain in every atmosphere.</p></fieldset>
-    <fieldset><legend>SHAPE THE HILLSIDE</legend>${slider('curves', 'Road curves', 0.2, 1.7, 0.05)}${slider('roadWidth', 'Road width', 7, 16, 0.5, ' m')}${slider('grade', 'Downhill slope', 0.03, 0.16, 0.01)}${slider('terrainHeight', 'Mountain height', 0.25, 2, 0.05)}${slider('treeDensity', 'Trees', 0, 2, 0.1)}${slider('fog', 'Misty distance', 0, 1, 0.05)}<div class="seed-row"><label for="seed">Landscape seed</label><input id="seed" type="number" data-setting="seed" min="1" max="99999" step="1"/><button class="icon-button" id="new-seed" aria-label="Generate another landscape" title="Another landscape">${icon('reset')}</button></div></fieldset>
+    <fieldset><legend>SHAPE THE HILLSIDE</legend>${slider('curveMix', 'Curve mix', limits.curveMix[0], limits.curveMix[1], 0.05)}<p class="field-note">Twisty ↔ Sweeping. In the middle: shorter bends, long arcs, flowing S-curves, and room to breathe.</p>${slider('curves', 'Curve tightness', 0.2, 1.7, 0.05)}${slider('curveLength', 'Curve length', limits.curveLength[0], limits.curveLength[1], 0.05)}<p class="field-note">Length stretches the curves; straights stay short. Tightness makes bends sharper or gentler. Curve mix changes how often you find each kind.</p>${slider('roadWidth', 'Road width', 7, 16, 0.5, ' m')}${slider('grade', 'Downhill slope', 0.03, 0.16, 0.01)}${slider('terrainHeight', 'Mountain height', 0.25, 2, 0.05)}${slider('treeDensity', 'Trees', 0, 2, 0.1)}${slider('fog', 'Misty distance', 0, 1, 0.05)}<div class="seed-row"><label for="seed">Landscape seed</label><input id="seed" type="number" data-setting="seed" min="1" max="99999" step="1"/><button class="icon-button" id="new-seed" aria-label="Generate another landscape" title="Another landscape">${icon('reset')}</button></div></fieldset>
     <fieldset><legend>FIND YOUR FLOW</legend>${slider('cruiseSpeed', 'Coasting speed', 15, 55, 1, ' km/h')}${slider('maxSpeed', 'Top speed', limits.maxSpeed[0], limits.maxSpeed[1], 1, ' km/h')}${slider('drift', 'Slide & drift', 0, 1, 0.05)}${slider('smoke', 'Tire smoke', 0, 1, 0.05)}<p class="field-note">Steer into a smooth rear-end slide. Release or countersteer to let the tail settle; you keep rolling forward. The brake still holds you completely still.</p></fieldset>
     <fieldset><legend>KEEP IT SMOOTH</legend>${slider('pixelRatio', 'Render quality', 0.75, 2, 0.25)}<p class="field-note">Lower this for a smoother drive on smaller devices.</p></fieldset>
     <fieldset><legend>UNDER THE HOOD</legend><label class="debug-toggle" for="debug-hitboxes"><input type="checkbox" id="debug-hitboxes"/> Show collision hitboxes <kbd>H</kbd></label><p class="field-note">Live body outlines and road/recovery limits. Uses the same geometry as collision detection. Scenery and mirrors do not cause crashes. Debug view is off on refresh.</p></fieldset>
@@ -183,6 +188,7 @@ let runResult: RunResult | null = null;
 const scoreStore = new ScoreboardStore();
 const onlineScores = new OnlineScoreboard();
 const worldClock = createWorldClock(settings);
+const replayRecorder = new ReplayRecorder();
 const controls = new Controls();
 const ambience = new Ambience();
 const dialog = $<HTMLDialogElement>('settings-dialog');
@@ -197,6 +203,44 @@ const scoreboard = new ScoreboardView(syncPlayUI, onlineScores);
 const garage = new Garage(settings, updateSettings);
 const carMenu = new CarMenu(settings, updateSettings);
 const composer = new WorldComposer(settings, updateSettings);
+const replayView = new ReplayView((open) => {
+  clearTimeout(rebuildTimer);
+  if (open) {
+    quickMenus.close(false);
+    paused = started;
+    controls.clear();
+  } else {
+    scene?.applySettings(settings);
+    scene?.resetMotion();
+  }
+  syncPlayUI();
+  updateHUD();
+  if (!open) $('open-replay').focus({ preventScroll: true });
+});
+const replayButton = document.createElement('button');
+replayButton.id = 'open-replay';
+replayButton.className = 'replay-button';
+replayButton.setAttribute('aria-haspopup', 'dialog');
+replayButton.setAttribute('aria-controls', 'replay-view');
+replayButton.innerHTML = `${icon('clapperboard')}<span>Replay & save video</span>`;
+const runActions = $('pause-card').querySelector<HTMLElement>('.mode-picker')!;
+runActions.setAttribute('aria-label', 'Run actions');
+runActions.append(replayButton);
+for (const id of ['open-replay', 'open-replay-toolbar'])
+  $(id).addEventListener('click', () => {
+    if (!scene) return;
+    // Include the exact paused/game-over endpoint between regular samples.
+    if (started)
+      replayRecorder.capture(
+        0,
+        settings,
+        state,
+        controls.read(),
+        mode === 'challenge' ? challenge : undefined,
+        true,
+      );
+    replayView.show(replayRecorder.snapshot(mode));
+  });
 const pauseFocus = new FocusScope(
   $('pause-card'),
   () =>
@@ -241,7 +285,9 @@ function syncSettingsUI() {
               ? `${Math.round(settings.grade * 100)}%`
               : key === 'fog' || key === 'drift' || key === 'roundness' || key === 'smoke'
                 ? `${Math.round(Number(settings[key]) * 100)}%`
-                : `${settings[key]}${input.dataset.suffix || '×'}`;
+                : key === 'curveMix'
+                  ? curveMixLabel(settings.curveMix)
+                  : `${settings[key]}${input.dataset.suffix || '×'}`;
     if (input.type === 'range') {
       if (output) input.setAttribute('aria-valuetext', output.textContent!);
       input.style.setProperty(
@@ -309,13 +355,13 @@ function updateSettings(patch: Partial<Settings>) {
   // Apply world changes together so dragging a slider doesn't rebuild every frame.
   clearTimeout(rebuildTimer);
   rebuildTimer = window.setTimeout(() => {
-    if (!inGarage) scene?.applySettings(settings);
+    if (!inGarage && !replayView.open) scene?.applySettings(settings);
   }, 120);
   if (mode === 'cozy') {
     const edge = roadOffsetLimit(settings.roadWidth, state.slide, settings.car);
     state.offset = Math.max(-edge, Math.min(edge, state.offset));
   } else if (
-    (['seed', 'curves', 'roadWidth', 'grade', 'car'] as const).some(
+    (['seed', 'curves', 'curveLength', 'curveMix', 'roadWidth', 'grade', 'car'] as const).some(
       (key) => previous[key] !== settings[key],
     ) &&
     challenge.phase === 'racing'
@@ -403,13 +449,25 @@ function syncPlayUI() {
   syncModeUI();
   carMenu.setOpen(quickMenus.current === 'car-menu');
   controls.setEnabled(
-    started && !paused && !inGarage && !dialog.open && !quickMenus.active && !scoreboard.open,
+    started &&
+      !paused &&
+      !inGarage &&
+      !dialog.open &&
+      !quickMenus.active &&
+      !scoreboard.open &&
+      !replayView.open,
   );
-  $('intro').hidden = started;
+  $('intro').hidden = started || replayView.open;
   $('drive-toolbar').hidden = !started || inGarage;
   const wasPauseVisible = !$('pause-card').hidden;
   $('pause-card').hidden =
-    !started || !paused || inGarage || dialog.open || quickMenus.active || scoreboard.open;
+    !started ||
+    !paused ||
+    inGarage ||
+    dialog.open ||
+    quickMenus.active ||
+    scoreboard.open ||
+    replayView.open;
   if (!wasPauseVisible && !$('pause-card').hidden) pauseFocus.focus();
   $('game-shell').classList.toggle('is-driving', started);
   $('game-shell').classList.toggle('is-paused', paused);
@@ -418,6 +476,7 @@ function syncPlayUI() {
 }
 
 function resetRun() {
+  replayRecorder.reset();
   state = initialState();
   if (mode === 'challenge') state.offset = settings.roadWidth / 4;
   challenge = initialChallenge(settings, state);
@@ -429,7 +488,7 @@ function resetRun() {
 }
 
 function start() {
-  if (!scene || scoreboard.open) return;
+  if (!scene || scoreboard.open || replayView.open) return;
   if (mode === 'challenge' && challenge.phase === 'gameover') resetRun();
   if (mode === 'challenge') onlineScores.begin(scoreRun);
   started = true;
@@ -439,10 +498,12 @@ function start() {
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
 }
 function restart() {
+  if (replayView.open) return;
   resetRun();
   start();
 }
 function togglePause() {
+  if (replayView.open) return;
   if (started) {
     if (mode === 'challenge' && challenge.phase === 'gameover') return;
     paused = !paused;
@@ -511,7 +572,7 @@ for (const id of ['open-scoreboard', 'open-scoreboard-hud'])
   $(id).addEventListener('click', () => {
     quickMenus.close(false);
     controls.clear();
-    scoreboard.show(scoreRun.category, runResult, unitSystem);
+    scoreboard.show(runResult, unitSystem);
   });
 $('reload').addEventListener('click', () => location.reload());
 $('open-settings').addEventListener('click', () => {
@@ -580,6 +641,7 @@ $('export-settings').addEventListener('click', () => {
 window.addEventListener('keydown', (event) => {
   const enter = event.key === 'Enter';
   if (
+    replayView.open ||
     inGarage ||
     dialog.open ||
     scoreboard.open ||
@@ -623,6 +685,7 @@ window.addEventListener('keydown', (event) => {
   if (event.code === 'KeyR' && started) restart();
 });
 function pauseAway() {
+  if (replayView.open) return;
   if (started) {
     paused = true;
     controls.clear();
@@ -655,7 +718,7 @@ function updateHUD() {
   $('score-category').textContent = scoreRun.category;
   $('score-category').title =
     scoreRun.category === 'custom'
-      ? 'Custom setup or mid-run changes. Scores use the separate Custom board.'
+      ? 'Custom setup or mid-run changes. All driving setups share the leaderboard.'
       : 'Standard driving difficulty';
   const incident =
     mode === 'challenge' &&
@@ -781,6 +844,12 @@ function frame(time: number) {
   const elapsed = Math.max(0, (time - lastTime) / 1000);
   const dt = Math.min(elapsed, 0.05);
   lastTime = time;
+  if (replayView.open && scene) {
+    replayView.render(scene, elapsed);
+    ambience.update(0, true, settings);
+    frameId = requestAnimationFrame(frame);
+    return;
+  }
   const active =
     started &&
     !paused &&
@@ -792,6 +861,7 @@ function frame(time: number) {
     !(mode === 'challenge' && challenge.phase === 'gameover');
   const input = controls.read(mode, state.speed);
   if (active) {
+    replayRecorder.capture(0, settings, state, input, mode === 'challenge' ? challenge : undefined);
     const worldPatch = stepWorldClock(worldClock, settings, elapsed);
     if (Object.keys(worldPatch).length) {
       // Transient world time is not a new saved preference or a manual timer reset.
@@ -806,6 +876,14 @@ function frame(time: number) {
       if (mode === 'challenge') {
         const previousPhase = challenge.phase;
         stepChallenge(challenge, state, input, settings, step);
+        replayRecorder.capture(
+          step,
+          settings,
+          state,
+          input,
+          challenge,
+          challenge.phase !== previousPhase,
+        );
         if (challenge.phase !== previousPhase) {
           if (challenge.phase === 'racing') {
             controls.clear();
@@ -829,6 +907,7 @@ function frame(time: number) {
       } else {
         const road = roadAt(state.distance, settings);
         stepDriving(state, input, settings, step, road.curvature, road.metric);
+        replayRecorder.capture(step, settings, state, input);
       }
       remaining -= step;
     }
@@ -892,6 +971,7 @@ function ensureDrivingScene() {
 }
 
 function syncLocation() {
+  if (replayView.open) replayView.close();
   if (scoreboard.open) scoreboard.dialog.close();
   inGarage = location.hash === '#garage';
   quickMenus.close(false);
@@ -954,6 +1034,7 @@ if (import.meta.env.DEV)
       paintColor: scene?.paintColor,
       started,
       paused,
+      replay: { ...replayView.telemetry, available: replayRecorder.available },
       quickMenu: quickMenus.current,
       scoreRun: structuredClone(scoreRun),
       runResult: runResult ? structuredClone(runResult) : null,
@@ -974,6 +1055,7 @@ if (import.meta.hot)
     cancelAnimationFrame(frameId);
     clearTimeout(rebuildTimer);
     controls.dispose();
+    replayView.dispose();
     pauseFocus.dispose();
     quickMenus.dispose();
     scoreboard.dispose();

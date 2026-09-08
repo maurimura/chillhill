@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { scoringDefaults } from '../src/config/scoring.ts';
 
 // Read-only production smoke check. This never starts a run or submits scores.
 const origin = 'https://chillhill.maurimura.dev';
@@ -13,6 +12,9 @@ async function check() {
     });
   const page = await request('/');
   assert.equal(page.status, 200, 'game HTML');
+  assert.match(page.headers.get('content-security-policy') ?? '', /script-src 'self'/);
+  assert.equal(page.headers.get('x-frame-options'), 'DENY');
+  assert.equal(page.headers.get('x-content-type-options'), 'nosniff');
   const html = await page.text();
   assert.match(html, /<title>chillhill/);
   assert.match(html, /property="og:image"/);
@@ -26,14 +28,11 @@ async function check() {
   assert.equal(bytes.toString('hex', 0, 8), '89504e470d0a1a0a');
   assert.equal(bytes.readUInt32BE(16), 1200);
   assert.equal(bytes.readUInt32BE(20), 630);
-  for (const category of ['standard', 'custom']) {
-    const response = await request(`/api/leaderboard?category=${category}`);
-    assert.equal(response.status, 200, `${category} leaderboard`);
-    const board = await response.json();
-    assert.equal(board.version, scoringDefaults.version);
-    assert.equal(board.category, category);
-    assert.ok(Array.isArray(board.entries) && board.entries.length <= 10);
-  }
+  const response = await request('/api/leaderboard');
+  assert.equal(response.status, 200, 'combined leaderboard');
+  const board = await response.json();
+  assert.equal(Object.hasOwn(board, 'version'), false);
+  assert.ok(Array.isArray(board.entries) && board.entries.length <= 10);
   const preferences = await request('/api/preferences');
   assert.equal(preferences.status, 200);
   const data = await preferences.json();
@@ -44,7 +43,7 @@ for (let attempt = 1; ; attempt++) {
   try {
     await check();
     console.log(
-      'PASS: deployed HTML, sharing image, both worldwide boards and country preferences.',
+      'PASS: deployed HTML, sharing image, the combined worldwide board and country preferences.',
     );
     break;
   } catch (error) {

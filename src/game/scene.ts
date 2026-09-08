@@ -3,7 +3,7 @@ import { styles, type Settings } from '../config';
 import { type DrivingState } from './driving';
 import { carAxles } from '../config/cars';
 import { buildVehicle, type CarVisual } from './vehicles';
-import { random, roadAt, roadElevation, terrainAt, nearbyLakes } from './route';
+import { random, roadAt, roadElevation, terrainAt, nearbyLakes, routeChunkLength } from './route';
 import { softBox, softCrown, softRock, softenNormals, terrainGeometry, mesaGeometry } from './art';
 import { TireSmoke } from './smoke';
 import { followDistance, framingPullback } from './camera';
@@ -20,7 +20,7 @@ import { CollisionDebug } from './collision-debug';
 import { TerrainPrefetch } from './terrain-prefetch';
 import { placeCelestialLight } from './celestial-light';
 
-const CHUNK = 180;
+const CHUNK = routeChunkLength;
 const UP = new THREE.Vector3(0, 1, 0);
 const dummy = new THREE.Object3D();
 
@@ -124,32 +124,40 @@ export class GameScene {
   private modelCenter = new THREE.Vector3();
   private modelCorners = Array.from({ length: 8 }, () => new THREE.Vector3());
   private cameraCorners = Array.from({ length: 8 }, () => new THREE.Vector3());
-  private observer: ResizeObserver;
+  private observer?: ResizeObserver;
   private firstFrame = true;
   private frontView = false;
   private settings: Settings;
-  private element: HTMLElement;
+  private element?: HTMLElement;
+  private exportCanvas?: OffscreenCanvas;
 
-  constructor(element: HTMLElement, settings: Settings) {
+  constructor(element: HTMLElement | OffscreenCanvas, settings: Settings) {
     this.scene.add(this.collisionDebug.lines);
-    this.element = element;
+    if (typeof OffscreenCanvas !== 'undefined' && element instanceof OffscreenCanvas)
+      this.exportCanvas = element;
+    else this.element = element as HTMLElement;
     this.settings = { ...settings };
     this.renderer = new THREE.WebGLRenderer({
+      canvas: this.exportCanvas,
       antialias: true,
       alpha: false,
       powerPreference: 'high-performance',
     });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, settings.pixelRatio));
+    this.renderer.setPixelRatio(
+      this.exportCanvas ? 1 : Math.min(devicePixelRatio, settings.pixelRatio),
+    );
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.15;
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.domElement.setAttribute(
-      'aria-label',
-      'A mountain road, viewed from behind your drifting car',
-    );
-    element.prepend(this.renderer.domElement);
+    if (this.element) {
+      this.renderer.domElement.setAttribute(
+        'aria-label',
+        'A mountain road, viewed from behind your drifting car',
+      );
+      this.element.prepend(this.renderer.domElement);
+    }
     this.scene.add(
       this.world,
       this.car,
@@ -188,15 +196,18 @@ export class GameScene {
     this.sun.name = 'celestial-disc';
     this.scene.add(this.sun);
     this.applySettings(settings);
-    this.observer = new ResizeObserver(() => this.resize());
-    this.observer.observe(element);
+    if (this.element) {
+      this.observer = new ResizeObserver(() => this.resize());
+      this.observer.observe(this.element);
+    }
     this.resize();
   }
 
   private resize() {
-    const { clientWidth: width, clientHeight: height } = this.element;
+    const width = this.exportCanvas?.width ?? this.element!.clientWidth;
+    const height = this.exportCanvas?.height ?? this.element!.clientHeight;
     if (width === 0 || height === 0) return;
-    this.renderer.setSize(width, height);
+    this.renderer.setSize(width, height, !this.exportCanvas);
     this.camera.aspect = width / Math.max(height, 1);
     this.camera.updateProjectionMatrix();
   }
@@ -209,6 +220,8 @@ export class GameScene {
       'style',
       'seed',
       'curves',
+      'curveLength',
+      'curveMix',
       'roadWidth',
       'grade',
       'terrainHeight',
@@ -244,7 +257,9 @@ export class GameScene {
     if (!this.scene.fog) this.scene.fog = new THREE.Fog(this.fogTarget);
     this.weather.configure(settings.weather, settings.weatherIntensity);
     this.ambient.groundColor.set(palette.ground);
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, settings.pixelRatio));
+    this.renderer.setPixelRatio(
+      this.exportCanvas ? 1 : Math.min(devicePixelRatio, settings.pixelRatio),
+    );
     for (const [name, color] of Object.entries({
       road: settings.roadSurface === 'gravel' ? palette.shoulder : palette.road,
       shoulder: palette.shoulder,
@@ -698,7 +713,7 @@ export class GameScene {
     // Forward travel will need one new chunk on the next boundary. Generate its
     // dense terrain off-thread while it is still hundreds of metres out of view.
     const nextChunk = lastChunk + 1;
-    if (nextChunk !== this.preparedForChunk) {
+    if (!this.exportCanvas && nextChunk !== this.preparedForChunk) {
       this.preparedForChunk = nextChunk;
       const palette = worldPalette(this.settings);
       this.terrainPrefetch.request(
@@ -938,7 +953,7 @@ export class GameScene {
   dispose() {
     this.terrainPrefetch.dispose();
     this.collisionDebug.dispose();
-    this.observer.disconnect();
+    this.observer?.disconnect();
     this.vehicle.dispose();
     this.smoke.mesh.removeFromParent();
     this.smoke.dispose();
@@ -971,6 +986,7 @@ export class GameScene {
       geometry.dispose();
     for (const material of [...Object.values(this.materials), ...materials]) material.dispose();
     this.renderer.dispose();
-    this.renderer.domElement.remove();
+    if (this.exportCanvas) this.renderer.forceContextLoss();
+    if (this.element) this.renderer.domElement.remove();
   }
 }

@@ -20,12 +20,22 @@ jobs:
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: Scan Git history for secrets
+        run: |
+          scanner_dir="$(mktemp -d)"
+          curl --fail --silent --show-error --location https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz --output "$scanner_dir/gitleaks.tar.gz"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $scanner_dir/gitleaks.tar.gz" | sha256sum --check
+          tar -xzf "$scanner_dir/gitleaks.tar.gz" -C "$scanner_dir" gitleaks
+          "$scanner_dir/gitleaks" git --redact --log-opts='--all --full-history -m' .
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: '24'
           cache: npm
       - run: npm ci
+      - name: Check dependencies for known vulnerabilities
+        run: npm audit --audit-level=moderate
       - name: Test physics, scoring, units and the leaderboard API
         run: npm test
       - name: Type-check and build
@@ -42,6 +52,19 @@ jobs:
           trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
           curl --fail --silent --retry 20 --retry-connrefused --retry-delay 1 "$TEST_URL" --output /dev/null
           npm run test:sharing
+      - name: Check local API and browser security policy
+        env:
+          CHROME_CHANNEL: chromium
+          CLOUDFLARE_TEST_URL: http://127.0.0.1:8787
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          npx --no-install wrangler d1 migrations apply chillhill-leaderboard --local --persist-to "$RUNNER_TEMP/chillhill-security-state"
+          npx --no-install wrangler dev --ip 127.0.0.1 --port 8787 --persist-to "$RUNNER_TEMP/chillhill-security-state" &
+          worker_pid=$!
+          trap 'kill "$worker_pid" 2>/dev/null || true' EXIT
+          curl --fail --silent --retry 20 --retry-connrefused --retry-delay 1 "$CLOUDFLARE_TEST_URL" --output /dev/null
+          npm run test:cloudflare
+          npm run test:security
       - name: Keep the verified site for deployment
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6

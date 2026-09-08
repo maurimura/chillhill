@@ -48,8 +48,8 @@ function run(row: ScoreRecord = record()): ScoreRun {
     customReasons: [...row.customReasons],
   };
 }
-function board(category: ScoreCategory, entries: unknown[] = []) {
-  return { version: scoringDefaults.version, category, entries };
+function board(entries: unknown[] = []) {
+  return { entries };
 }
 
 function setup(t: TestContext, enabled = true) {
@@ -116,7 +116,7 @@ test('disabled online board remains local-only with no session or leaderboard re
   assert.equal(client.result?.status, 'offline');
   assert.equal(client.result?.retryable, false);
   assert.match(client.result!.message, /personal|locally/i);
-  await client.refresh('standard');
+  await client.refresh();
   assert.equal(client.loading, false);
   assert.match(client.error, /deployed game/i);
   await client.submitName('Mauri');
@@ -233,7 +233,7 @@ test('reset and a newer run suppress stale session and finish completions', asyn
   assert.equal(client.result, null);
 });
 
-test('name saving rechecks current rank, publishes only once, and refreshes that category', async (t) => {
+test('name saving rechecks current rank, publishes only once, and refreshes the combined board', async (t) => {
   const { client, calls, respond, body, qualified } = setup(t);
   await qualified(record('run-1', 'custom'));
   const first = client.submitName('José Drift');
@@ -247,8 +247,8 @@ test('name saving rechecks current rank, publishes only once, and refreshes that
   await Promise.all([first, second]);
   assert.equal(client.result?.status, 'saved');
   assert.equal(client.result?.rank, 5, 'rank may move between finishing and naming');
-  assert.equal(calls[3].url, '/api/leaderboard?category=custom');
-  respond(3, board('custom', [{ name: 'José Drift', record: record('run-1', 'custom') }]));
+  assert.equal(calls[3].url, '/api/leaderboard');
+  respond(3, board([{ name: 'José Drift', record: record('run-1', 'custom') }]));
   await flush();
   assert.equal(client.entries[0].name, 'José Drift');
   await client.submitName('Another name');
@@ -266,7 +266,7 @@ test('losing the tenth place before naming closes the prompt without losing the 
   assert.equal(client.result?.recordId, 'run-1');
   assert.equal(client.result?.rank, null);
   assert.match(client.result!.message, /personal record.*saved/i);
-  respond(3, board('standard'));
+  respond(3, board());
   await flush();
   await client.submitName('Mauri');
   assert.equal(calls.length, 4);
@@ -287,7 +287,7 @@ test('name errors preserve qualification, present a bounded error, and allow ret
   respond(3, { qualified: true, rank: 3 });
   await retry;
   assert.equal(client.result?.status, 'saved');
-  respond(4, board('standard'));
+  respond(4, board());
 });
 
 test('stale name completion cannot replace a newly reset run or refresh its board', async (t) => {
@@ -302,22 +302,19 @@ test('stale name completion cannot replace a newly reset run or refresh its boar
   assert.equal(calls.length, 3);
 });
 
-test('finishing a name submission cannot replace the category selected while it was pending', async (t) => {
+test('finishing a name submission refreshes the combined board after a pending refresh', async (t) => {
   const { client, calls, respond, qualified } = setup(t);
   await qualified();
   const save = client.submitName('Mauri');
   await flush();
-  const custom = client.refresh('custom');
-  respond(3, board('custom', [{ name: 'Custom driver', record: record('custom', 'custom') }]));
+  const custom = client.refresh();
+  respond(3, board([{ name: 'Custom driver', record: record('custom', 'custom') }]));
   await custom;
   respond(2, { qualified: true, rank: 3 });
   await save;
   for (let index = 4; index < calls.length; index++) {
-    assert.equal(calls[index].url, '/api/leaderboard?category=custom');
-    respond(
-      index,
-      board('custom', [{ name: 'Custom driver', record: record('custom', 'custom') }]),
-    );
+    assert.equal(calls[index].url, '/api/leaderboard');
+    respond(index, board([{ name: 'Custom driver', record: record('custom', 'custom') }]));
   }
   await flush();
   assert.deepEqual(
@@ -326,16 +323,16 @@ test('finishing a name submission cannot replace the category selected while it 
   );
 });
 
-test('category switching and overlapping refreshes keep only the latest result and loading state', async (t) => {
+test('overlapping refreshes keep only the latest result and loading state', async (t) => {
   const { client, calls, respond } = setup(t);
-  const standard = client.refresh('standard');
-  const custom = client.refresh('custom');
+  const standard = client.refresh();
+  const custom = client.refresh();
   assert.equal(client.loading, true);
-  respond(0, board('standard', [{ name: 'Old', record: record() }]));
+  respond(0, board([{ name: 'Old', record: record() }]));
   await standard;
   assert.equal(client.loading, true, 'an old request cannot clear the new loading state');
   assert.deepEqual(client.entries, []);
-  respond(1, board('custom', [{ name: 'Current', record: record('custom', 'custom') }]));
+  respond(1, board([{ name: 'Current', record: record('custom', 'custom') }]));
   await custom;
   assert.equal(client.loading, false);
   assert.equal(client.error, '');
@@ -343,9 +340,9 @@ test('category switching and overlapping refreshes keep only the latest result a
     client.entries.map((entry) => entry.name),
     ['Current'],
   );
-  const older = client.refresh('custom');
-  const newer = client.refresh('standard');
-  respond(3, board('standard', [{ name: 'Latest', record: record() }]));
+  const older = client.refresh();
+  const newer = client.refresh();
+  respond(3, board([{ name: 'Latest', record: record() }]));
   await newer;
   respond(2, { error: 'Stale failure' }, 503);
   await older;
@@ -357,27 +354,24 @@ test('category switching and overlapping refreshes keep only the latest result a
 
 test('list transport failures and incompatible responses are recoverable and never show stale rows', async (t) => {
   const { client, respond } = setup(t);
-  const first = client.refresh('standard');
+  const first = client.refresh();
   respond(0, '<html>Vite fallback page</html>', 200, 'text/html');
   await first;
   assert.equal(client.loading, false);
   assert.match(client.error, /unavailable/i);
   assert.deepEqual(client.entries, []);
   for (const [i, invalid] of [
-    { ...board('standard'), version: 999 },
-    board('custom'),
-    board(
-      'standard',
-      Array.from({ length: 11 }, () => ({ name: 'Driver', record: record() })),
-    ),
+    null,
+    { ...board(), entries: null },
+    board(Array.from({ length: 11 }, () => ({ name: 'Driver', record: record() }))),
   ].entries()) {
-    const pending = client.refresh('standard');
+    const pending = client.refresh();
     respond(i + 1, invalid);
     await pending;
     assert.match(client.error, /incompatible/i);
   }
-  const recovered = client.refresh('standard');
-  respond(4, board('standard', [{ name: 'Driver', record: record() }]));
+  const recovered = client.refresh();
+  respond(4, board([{ name: 'Driver', record: record() }]));
   await recovered;
   assert.equal(client.error, '');
   assert.equal(client.entries.length, 1);
@@ -399,22 +393,25 @@ test('public rows whitelist score fields; session tokens stay in request bodies 
   });
   const { client, calls, respond, qualified } = setup(t);
   await qualified();
-  const list = client.refresh('standard');
+  const list = client.refresh();
   respond(
     2,
-    board('standard', [
+    board([
       {
         name: 'Driver',
         token: capability,
         record: { ...record(), token: capability, html: '<script>' },
       },
-      { name: 'Wrong category', record: record('wrong', 'custom') },
+      { name: 'Custom driver', record: record('custom', 'custom') },
       { name: 'Invalid score', record: { ...record(), score: Infinity } },
       { name: 'x'.repeat(41), record: record('long') },
     ]),
   );
   await list;
-  assert.deepEqual(client.entries, [{ name: 'Driver', record: record() }]);
+  assert.deepEqual(client.entries, [
+    { name: 'Driver', record: record() },
+    { name: 'Custom driver', record: record('custom', 'custom') },
+  ]);
   assert.equal(
     JSON.stringify({ result: client.result, entries: client.entries }).includes(capability),
     false,
@@ -433,13 +430,30 @@ test('subscriptions unsubscribe cleanly and disposal suppresses deferred async u
   unsubscribe();
   const complete = client.complete(record());
   assert.equal(changes, beforeUnsubscribe);
-  const pending = client.refresh('standard');
+  const pending = client.refresh();
   const snapshot = structuredClone(client.result);
   client.dispose();
   respond(0, session);
-  respond(1, board('standard', [{ name: 'Too late', record: record() }]));
+  respond(1, board([{ name: 'Too late', record: record() }]));
   await Promise.all([complete, pending]);
   assert.deepEqual(client.result, snapshot);
   assert.deepEqual(client.entries, []);
   assert.equal(changes, beforeUnsubscribe);
+});
+
+test('the all-time board displays old and new records without a matching response version', async (t) => {
+  const { client, respond } = setup(t);
+  const entries = [
+    { name: 'Older driver', record: { ...record('older', 'custom'), version: 1 } },
+    { name: 'Current driver', record: record('current') },
+    {
+      name: 'Future driver',
+      record: { ...record('future'), version: scoringDefaults.version + 1 },
+    },
+  ];
+  const list = client.refresh();
+  respond(0, board(entries));
+  await list;
+  assert.equal(client.error, '');
+  assert.deepEqual(client.entries, entries);
 });

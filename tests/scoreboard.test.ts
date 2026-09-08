@@ -66,7 +66,7 @@ function storage() {
 
 test('Standard uses canonical physics, allowing any starting car/seed and visual preferences', () => {
   assert.equal(standardDriving.maxSpeed, 280);
-  assert.equal(scoringDefaults.version, 4);
+  assert.equal(scoringDefaults.version, 6);
   assert.equal(createScoreRun({ ...settings, maxSpeed: 110 }).category, 'custom');
   const run = createScoreRun(settings, 'run');
   assert.equal(run.category, 'standard');
@@ -84,13 +84,43 @@ test('Standard uses canonical physics, allowing any starting car/seed and visual
     createScoreRun({ ...settings, seed: 9856, car: 'peugeot-206' }).category,
     'standard',
   );
-  for (const key of Object.keys(standardDriving)) {
-    assert.equal(createScoreRun({ ...settings, [key]: 0.5 }, 'run').category, 'custom', key);
+  for (const [key, value] of Object.entries(standardDriving)) {
+    assert.equal(
+      createScoreRun({ ...settings, [key]: value * 0.9 }, 'run').category,
+      'custom',
+      key,
+    );
   }
 });
 
+test('legacy settings inherit default curve length without a false mid-run tuning change', () => {
+  const legacy = { ...settings, curveLength: undefined };
+  const run = createScoreRun(legacy);
+  trackScoreSettings(run, legacy, { ...settings, curveLength: 1 });
+  assert.equal(run.category, 'standard');
+  trackScoreSettings(run, { ...settings, curveLength: 1 }, { ...settings, curveLength: 1.4 });
+  assert.equal(run.category, 'custom');
+  assert.deepEqual(run.customReasons, ['tuning']);
+});
+
+test('older saves inherit balanced curve mix and manual mix changes are Custom', () => {
+  const legacy = { ...settings, curveMix: undefined };
+  const run = createScoreRun(legacy);
+  trackScoreSettings(run, legacy, { ...settings, curveMix: 0.5 });
+  assert.equal(run.category, 'standard');
+  trackScoreSettings(run, { ...settings, curveMix: 0.5 }, { ...settings, curveMix: 0.8 });
+  assert.equal(run.category, 'custom');
+  assert.deepEqual(run.customReasons, ['tuning']);
+});
+
 test('mid-run difficulty/car/route changes permanently classify Custom without growing metadata', () => {
-  for (const patch of [{ car: 'peugeot-206' }, { seed: 73 }, { roadWidth: 14 }]) {
+  for (const patch of [
+    { car: 'peugeot-206' },
+    { seed: 73 },
+    { roadWidth: 14 },
+    { curveLength: 1.5 },
+    { curveMix: 0.8 },
+  ]) {
     const run = createScoreRun(settings, 'run');
     const changed = { ...settings, ...patch };
     for (let i = 0; i < 50; i++) {
@@ -124,20 +154,22 @@ test('only game over creates a detached record with a consistent score breakdown
   assert.deepEqual(row.cars, ['astra']);
 });
 
-test('top ten per category are sorted, deduplicated, and ties use misses then earlier completion', () => {
+test('one combined top ten is sorted, deduplicated, and ties use misses then earlier completion', () => {
   const rows = Array.from({ length: 30 }, (_, i) =>
     record(`id-${i}`, i * 10, i % 2 ? 'standard' : 'custom'),
   );
   const ranked = rankScores([...rows, ...rows]);
-  assert.equal(ranked.length, 20);
-  assert.equal(ranked.filter((row) => row.category === 'standard').length, 10);
-  assert.equal(ranked[0].score, 290);
-  assert.equal(ranked[10].score, 280);
+  assert.equal(ranked.length, 10);
+  assert.equal(ranked.filter((row) => row.category === 'standard').length, 5);
+  assert.deepEqual(
+    ranked.map((row) => row.score),
+    [290, 280, 270, 260, 250, 240, 230, 220, 210, 200],
+  );
   assert.deepEqual(
     rankScores([
       { ...record('late'), finishedAt: '2026-09-08T12:00:00Z' },
       record('early'),
-      { ...record('misses'), nearMisses: 4 },
+      { ...record('misses', 100, 'custom'), nearMisses: 4 },
     ]).map((row) => row.id),
     ['misses', 'early', 'late'],
   );
@@ -149,7 +181,9 @@ test('local records survive reload, merge across tabs, and do not duplicate on s
     b = new ScoreboardStore(disk);
   assert.equal(a.save(record('first')).personalBest, true);
   assert.equal(b.save(record('second', 120)).personalBest, true);
-  assert.equal(a.save(record('custom', 50, 'custom')).personalBest, true);
+  const custom = a.save(record('custom', 50, 'custom'));
+  assert.equal(custom.personalBest, false);
+  assert.equal(custom.rank, 3);
   assert.equal(a.save(record('first')).personalBest, false);
   const reload = new ScoreboardStore(disk);
   assert.equal(reload.records.length, 3);
@@ -173,7 +207,25 @@ test('blocked storage and quota failures retain a bounded session board without 
   assert.equal(store.records[0].score, 99);
 });
 
-test('corrupt, oversized, wrong-version or forged-shape records are discarded safely', () => {
+test('existing private category boards load as one top ten under the same storage key', () => {
+  const disk = storage();
+  disk.setItem(
+    scoreStorageKey,
+    JSON.stringify({
+      version: scoringDefaults.version,
+      records: Array.from({ length: 20 }, (_, i) =>
+        record(`old-${i}`, i * 10, i % 2 ? 'custom' : 'standard'),
+      ),
+    }),
+  );
+  const store = new ScoreboardStore(disk);
+  assert.deepEqual(
+    store.records.map((row) => row.score),
+    [190, 180, 170, 160, 150, 140, 130, 120, 110, 100],
+  );
+});
+
+test('corrupt, oversized or forged-shape records are discarded safely', () => {
   const disk = storage();
   for (const raw of ['{', 'null', '[]', '{"version":1,"records":null}', ' '.repeat(100001)]) {
     disk.setItem(scoreStorageKey, raw);
@@ -195,7 +247,7 @@ test('corrupt, oversized, wrong-version or forged-shape records are discarded sa
   ];
   assert.deepEqual(rankScores(invalid), []);
   disk.setItem(scoreStorageKey, JSON.stringify({ version: 1, records: [record()] }));
-  assert.deepEqual(readScores(disk), []);
+  assert.deepEqual(readScores(disk), [record()]);
   disk.setItem(
     scoreStorageKey,
     JSON.stringify({ version: scoringDefaults.version, records: [record(), ...invalid] }),
@@ -203,18 +255,47 @@ test('corrupt, oversized, wrong-version or forged-shape records are discarded sa
   assert.equal(readScores(disk).length, 1);
 });
 
-test('current rules leave older personal records untouched', () => {
+test('private scores merge across versions and persist under one permanent key', () => {
   const disk = storage();
-  const original = JSON.stringify({ version: 1, records: [{ ...record(), version: 1 }] });
-  disk.setItem('chillhill.scores.v1', original);
-  disk.setItem('chillhill.scores.v2', original);
-  const v3 = JSON.stringify({ version: 3, records: [{ ...record(), version: 3 }] });
-  disk.setItem('chillhill.scores.v3', v3);
+  const originals = new Map<string, string>();
+  for (let version = 1; version <= scoringDefaults.version; version++) {
+    const key = `chillhill.scores.v${version}`;
+    const value = JSON.stringify({
+      version,
+      records: [{ ...record(`old-${version}`, 1000 - version), version }],
+    });
+    originals.set(key, value);
+    disk.setItem(key, value);
+  }
   const store = new ScoreboardStore(disk);
-  assert.equal(store.records.length, 0);
-  store.save(record('new-rules'));
-  assert.equal(disk.getItem('chillhill.scores.v1'), original);
-  assert.equal(disk.getItem('chillhill.scores.v2'), original);
-  assert.equal(disk.getItem('chillhill.scores.v3'), v3);
-  assert.equal(readScores(disk).length, 1);
+  assert.equal(scoreStorageKey, 'chillhill.scores');
+  assert.equal(store.records[0].version, 1);
+  assert.equal(store.save(record('new-game', 10)).personalBest, false);
+  for (const [key, value] of originals) assert.equal(disk.getItem(key), value);
+  const saved = JSON.parse(disk.getItem(scoreStorageKey)!);
+  assert.equal(Object.hasOwn(saved, 'version'), false);
+  assert.deepEqual(new ScoreboardStore(disk).records, store.records);
+});
+
+test('records with older or future version metadata still compete while malformed scores stay invalid', () => {
+  const rows = [
+    { ...record('older', 200), version: 1 },
+    record('current', 150),
+    { ...record('future', 250), version: scoringDefaults.version + 1 },
+  ];
+  assert.deepEqual(
+    rankScores(rows).map((row) => row.id),
+    ['future', 'older', 'current'],
+  );
+  for (const version of [0, -1, 1.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])
+    assert.deepEqual(rankScores([{ ...record(), version }]), []);
+});
+
+test('corrupt saves do not hide valid scores in other versioned keys', () => {
+  const disk = storage();
+  disk.setItem(scoreStorageKey, '{');
+  disk.setItem('chillhill.scores.v1', 'null');
+  const older = { ...record('older'), version: 2 };
+  disk.setItem('chillhill.scores.v2', JSON.stringify({ version: 2, records: [older] }));
+  assert.deepEqual(readScores(disk), [older]);
 });

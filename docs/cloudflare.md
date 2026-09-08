@@ -10,7 +10,7 @@ crawler. Only a successful `main` run deploys. The deployment job downloads the
 verified static build, applies pending D1 migrations, then runs Wrangler against
 the existing `chillhill` Worker and database. Deployments are serialized and are
 never canceled halfway through a migration. A read-only smoke test verifies the
-live game, share image, both worldwide boards, and country preferences.
+live game, share image, the combined worldwide board, and country preferences.
 
 ### One-time deployment secret
 
@@ -32,6 +32,12 @@ Actions use pinned official commit SHAs, `contents: read`, and no persisted chec
 credentials; monthly Dependabot PRs update action pins. PR jobs receive no deployment
 secret and never access the production database.
 
+CI also scans the full checked-out Git history with checksum-pinned Gitleaks,
+checks npm advisories, and tests the production browser security policy and API
+against disposable local D1 state. Weekly npm Dependabot updates keep application
+and build dependencies under review. See [the security review](security-review.md)
+for findings, remaining limitations, and repository settings.
+
 References: [Cloudflare GitHub Actions setup](https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/),
 [GitHub workflow security](https://docs.github.com/en/actions/reference/security/secure-use).
 
@@ -50,6 +56,12 @@ another database for routine updates.
 First published on September 7, 2026. The production database starts with empty
 leaderboards; local test names and scores are not imported.
 
+Leaderboard entries live in D1 separately from Worker deployments. Reusing the same
+database binding preserves them across releases. The combined board ranks existing
+Standard and Custom entries together across all game versions. Migrations
+`0002_combined_leaderboard.sql` and `0003_all_time_leaderboard.sql` add ranking
+indexes without deleting records. Legacy category and version query parameters are ignored.
+
 For subsequent releases:
 
 ```sh
@@ -59,7 +71,7 @@ npm run deploy
 ```
 
 Renew authentication with `npx wrangler login` if needed. Verify the homepage and
-both `/api/leaderboard?category=standard` and `/api/leaderboard?category=custom`
+`/api/leaderboard`
 after deploying. Keep production smoke checks read-only apart from ordinary game
 sessions; `npm run test:cloudflare` intentionally accepts only localhost.
 
@@ -78,7 +90,7 @@ sessions; `npm run test:cloudflare` intentionally accepts only localhost.
 4. Run `npm run db:migrate:remote` to create the leaderboard tables.
 5. Run `npm test`, `npm run build`, then `npm run deploy`.
 6. Verify HTTPS at `https://chillhill.maurimura.dev` and
-   `/api/leaderboard?category=standard`. Play a real completed Drift king run, claim
+   `/api/leaderboard`. Play a real completed Drift king run, claim
    a qualifying score with a nickname, and view it from a second browser. Do not
    seed test scores into production.
 
@@ -105,12 +117,12 @@ server. Music files and their attribution are deployed with the other static ass
 ## Leaderboard behavior and limits
 
 - The visible board is worldwide only. Production game-over results show the
-  matching category beside the run summary (stacked on phones), with no source
-  picker. Qualifying runs automatically show/focus the public nickname form.
+  combined top ten beside the run summary (stacked on phones), with no source
+  or category picker. Standard and Custom runs compete in the same ranking. Qualifying runs automatically show/focus the public nickname form.
   Local records are retained privately for resilience, not shown as a second board.
 - A server-issued, expiring run token is requested when Drift king starts. Tokens
   stay in memory, never in local storage or URLs. Offline runs still save locally.
-- Only positive, completed runs that reach a category's top ten can enter a public
+- Only positive, completed runs that reach the combined top ten can enter a public
   nickname. Nothing is published until the player chooses to submit it. Rank is
   checked again atomically at submission, because another player may have moved
   ahead while the form was open. Abandoned name prompts do not occupy a rank.
@@ -119,13 +131,29 @@ server. Music files and their attribution are deployed with the other static ass
   salted IP hashes for abuse limiting; raw addresses are not stored in D1.
 - Requests have bounded bodies, same-origin checks, input validation, hashed
   session tokens, replay protection, and score/speed/time plausibility limits.
-  Sessions and abuse counters expire; each category retains ten named records.
+  Sessions and abuse counters expire; the board retains one all-time top ten of named records.
+- The `API_RATE_LIMITER` binding rejects bursts before D1 access: 60 requests per
+  minute per source address and operation (board reads, run starts, run writes).
+  All leaderboard queries share the read allowance; all run IDs share the
+  write allowance. Keep this binding configured: missing/unavailable limits make
+  leaderboard requests return 503 while the game and country preferences work.
+  The existing durable hourly limits still apply to writes. Cloudflare's counters
+  are approximate and per location, so this reduces abuse rather than imposing a
+  global spending cap. Shared networks can share an allowance. The daily hashed
+  edge keys are pseudonymous, not anonymous; raw addresses are never stored in D1.
+- `public/_headers` sets the static site's Content Security Policy, frame blocking,
+  HTTPS policy and other browser protections. API responses set their own headers.
+  Scripts, workers and network requests are restricted to this site's origin;
+  inline styles support paint/UI controls, and data/blob images support previews.
+  Test through Wrangler with `npm run test:security`; Vite preview does not apply
+  Cloudflare's `_headers` rules.
 - **This is a community leaderboard, not cheat-proof competitive ranking.** The
   browser still calculates the run. A determined modified client can fabricate
   plausible statistics. Server-side simulation/replay verification would be a
   separate feature before introducing prizes or competitive rewards.
-- Rules v4 raises the Standard top speed to 280 km/h. Older v1/v2/v3 personal records
-  and D1 rows remain untouched; current boards only rank matching rules.
+- Scoring-version metadata is retained only as history. It never separates the
+  public ranking, qualification, or name admission. Private records read older
+  versioned browser saves and use the permanent `chillhill.scores` key for new saves.
 - `/api/preferences` uses Cloudflare's country metadata for automatic driving
   units. It needs no database and returns only a country code with `no-store`;
   it never returns or records an IP, city or precise location.

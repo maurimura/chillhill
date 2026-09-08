@@ -26,6 +26,7 @@
     "test:online-scoreboard": "node scripts/online-scoreboard-check.mjs",
     "test:run-leaderboard": "node scripts/run-leaderboard-check.mjs",
     "test:cloudflare": "node scripts/cloudflare-check.mjs",
+    "test:security": "node scripts/security-check.mjs",
     "test:offroad": "node scripts/offroad-check.mjs",
     "test:hitboxes": "node scripts/hitbox-check.mjs",
     "test:readability": "node scripts/readability-check.mjs",
@@ -40,6 +41,7 @@
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.3.0",
     "@fontsource/dm-serif-display": "^5.3.0",
+    "mediabunny": "^1.55.7",
     "three": "^0.185.1"
   },
   "devDependencies": {

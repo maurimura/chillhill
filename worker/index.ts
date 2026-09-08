@@ -17,6 +17,7 @@ export interface Database {
 export interface Env {
   DB: Database;
   ASSETS: { fetch(request: Request): Promise<Response> };
+  API_RATE_LIMITER: { limit(options: { key: string }): Promise<{ success: boolean }> };
 }
 interface Session {
   run_id: string;
@@ -47,7 +48,7 @@ const ahead = `(e.score > s.score
     AND e.finished_at = s.finished_at AND e.run_id < s.run_id))`;
 const rankQuery = `SELECT 1 + COUNT(*) AS rank FROM leaderboard_entries e
   JOIN leaderboard_sessions s ON s.run_id = ?
-  WHERE e.version = s.version AND e.category = s.category AND e.run_id != s.run_id
+  WHERE e.run_id != s.run_id
   AND ${ahead}`;
 
 class ApiError extends Error {
@@ -65,6 +66,11 @@ function json(data: unknown, status = 200) {
       'Cache-Control': 'no-store',
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'same-origin',
+      'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
+      'X-Frame-Options': 'DENY',
+      'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+      'Strict-Transport-Security': 'max-age=31536000',
+      ...(status === 429 ? { 'Retry-After': '60' } : {}),
     },
   });
 }
@@ -130,7 +136,26 @@ async function body(request: Request): Promise<Record<string, unknown>> {
   }
 }
 
-/** Coarse cost guard, not identity or anti-cheat. No raw addresses are retained. */
+/** Reject bursts before D1, including reads and already exhausted writers.
+ * Cloudflare supplies the address; caller-controlled run IDs/forwarding headers
+ * must not create new buckets. Edge counters are approximate and location-local.
+ * A missing/broken binding fails closed through the API's generic 503 handler. */
+async function edgeRateLimit(
+  request: Request,
+  env: Env,
+  now: number,
+  operation: 'read' | 'start' | 'write',
+) {
+  const address = request.headers.get('cf-connecting-ip') ?? 'local-development';
+  const identity = await hash(`chillhill:${Math.floor(now / (24 * hour))}:${address}`);
+  const { success } = await env.API_RATE_LIMITER.limit({
+    key: `chillhill:${operation}:${identity}`,
+  });
+  if (!success)
+    throw new ApiError(429, 'Too many requests. Take a breather and try again shortly.');
+}
+
+/** Durable hourly write guard, not identity or anti-cheat. No raw addresses are retained. */
 async function rateLimit(request: Request, db: Database, now: number, starting: boolean) {
   const secret = randomSecret();
   const [, salts] = await db.batch<{ value: string }>([
@@ -158,7 +183,8 @@ async function rateLimit(request: Request, db: Database, now: number, starting: 
 
 async function startRun(data: Record<string, unknown>, db: Database, now: number) {
   if (
-    data.version !== scoringDefaults.version ||
+    !Number.isSafeInteger(data.version) ||
+    Number(data.version) < 1 ||
     !category(data.category) ||
     typeof data.car !== 'string' ||
     !Object.hasOwn(cars, data.car) ||
@@ -320,23 +346,16 @@ async function nameRun(data: Record<string, unknown>, db: Database, session: Ses
       SELECT s.run_id,s.record_id,s.version,s.category,?,s.score,s.near_misses,s.finished_at,s.record_json
       FROM leaderboard_sessions s WHERE s.run_id = ? AND s.score > 0
       AND (s.name IS NULL OR s.name = ?) AND (
-        SELECT COUNT(*) FROM leaderboard_entries e WHERE e.version = s.version
-        AND e.category = s.category AND e.run_id != s.run_id AND ${ahead}
+        SELECT COUNT(*) FROM leaderboard_entries e WHERE e.run_id != s.run_id AND ${ahead}
       ) < ?`,
       )
       .bind(name, session.run_id, name, scoringDefaults.leaderboardSize),
     db
       .prepare(
-        `DELETE FROM leaderboard_entries WHERE version = ? AND category = ? AND run_id NOT IN (
-      SELECT run_id FROM leaderboard_entries WHERE version = ? AND category = ? ORDER BY ${order} LIMIT ?)`,
+        `DELETE FROM leaderboard_entries WHERE run_id NOT IN (
+      SELECT run_id FROM leaderboard_entries ORDER BY ${order} LIMIT ?)`,
       )
-      .bind(
-        session.version,
-        session.category,
-        session.version,
-        session.category,
-        scoringDefaults.leaderboardSize,
-      ),
+      .bind(scoringDefaults.leaderboardSize),
     db
       .prepare(
         `UPDATE leaderboard_sessions SET name = (
@@ -370,17 +389,14 @@ export async function handleRequest(
         'The shared leaderboard is not connected yet. Local scores still work.',
       );
     if (url.pathname === '/api/leaderboard' && request.method === 'GET') {
-      const selected = url.searchParams.get('category') ?? 'standard';
-      if (!category(selected)) throw new ApiError(400, 'Choose Standard or Custom.');
+      await edgeRateLimit(request, env, now, 'read');
       const rows = await env.DB.prepare(
         `SELECT name,record_json FROM leaderboard_entries
-        WHERE version = ? AND category = ? ORDER BY ${order} LIMIT ?`,
+        ORDER BY ${order} LIMIT ?`,
       )
-        .bind(scoringDefaults.version, selected, scoringDefaults.leaderboardSize)
+        .bind(scoringDefaults.leaderboardSize)
         .all<{ name: string; record_json: string }>();
       const response: LeaderboardResponse = {
-        version: scoringDefaults.version,
-        category: selected,
         entries: rows.results.map((row) => ({
           name: row.name,
           record: JSON.parse(row.record_json) as ScoreRecord,
@@ -392,6 +408,7 @@ export async function handleRequest(
     const starting = url.pathname === '/api/runs';
     if (!starting && !match) throw new ApiError(404, 'This leaderboard endpoint does not exist.');
     if (request.method !== 'POST') throw new ApiError(405, 'Use POST for run submissions.');
+    await edgeRateLimit(request, env, now, starting ? 'start' : 'write');
     const data = await body(request);
     await rateLimit(request, env.DB, now, starting);
     if (starting) return await startRun(data, env.DB, now);

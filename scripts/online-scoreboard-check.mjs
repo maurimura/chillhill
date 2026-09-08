@@ -12,8 +12,7 @@ const textSelectors = [
   '#online-run label',
   '#leaderboard-name',
   '.leaderboard-name-row button:not(:disabled)',
-  '.scoreboard-tabs button',
-  '#scoreboard-category-note',
+  '#scoreboard-note',
   '.scoreboard-ride > strong',
   '.scoreboard-ride > span',
   '.scoreboard-points',
@@ -101,7 +100,7 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
           setItem: (key, value) => memory.set(key, value),
         });
         const record = (id, category = 'standard', index = 0) => ({
-          version: scoringDefaults.version,
+          version: (index % 3) + 1,
           id,
           seed: 43112,
           car: 'astra',
@@ -173,17 +172,11 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
               });
             return response(result);
           }
-          if (url.startsWith('/api/leaderboard?')) {
+          if (url === '/api/leaderboard') {
             if (harness.options.listOffline) throw new TypeError('Network unavailable');
-            const category = new URL(url, location.origin).searchParams.get('category');
             return response({
-              version: scoringDefaults.version,
-              category,
               entries: Array.from({ length: 10 }, (_, index) =>
-                harness.options.inline &&
-                online.result?.status === 'saved' &&
-                index === 2 &&
-                category === harness.lastResult.record.category
+                harness.options.inline && online.result?.status === 'saved' && index === 2
                   ? {
                       name: harness.calls.filter((call) => call.url.endsWith('/name')).at(-1).data
                         .name,
@@ -196,7 +189,7 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
                           : index === 1
                             ? 'WWWWWWWWWWWWWWWWWWWW'
                             : `Road pal ${index + 1}`,
-                      record: record(`public-${category}-${index}`, category, index),
+                      record: record(`public-${index}`, index % 2 ? 'custom' : 'standard', index),
                     },
               ),
             });
@@ -241,7 +234,7 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
             document.querySelector('#open-scoreboard').hidden = true;
             host.hidden = false;
             view.embed(host, result, 'metric');
-          } else view.show(row.category, result, 'metric');
+          } else view.show(result, 'metric');
           const completion = online.complete(row);
           if (!options.holdFinish) await completion;
         };
@@ -273,7 +266,7 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
       await close();
       await page.evaluate(() => {
         const harness = window.__onlineHarness;
-        harness.view.show('standard', harness.lastResult, 'metric');
+        harness.view.show(harness.lastResult, 'metric');
       });
       assert.equal(
         await page.evaluate(() => document.activeElement?.id),
@@ -281,7 +274,7 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
         'opening a qualified result focuses name entry',
       );
       await page.locator('#leaderboard-name').fill('Astra pal');
-      await page.evaluate(() => window.__onlineHarness.online.refresh('standard'));
+      await page.evaluate(() => window.__onlineHarness.online.refresh());
       await page.waitForFunction(() => !window.__onlineHarness.online.loading);
       assert.equal(await page.locator('#leaderboard-name').inputValue(), 'Astra pal');
       await page.locator('#leaderboard-name').focus();
@@ -348,10 +341,10 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
         0,
         'worldwide is the only board',
       );
-      await page.locator('[data-score-category="custom"]').click();
+      assert.equal(await page.locator('[data-score-category]').count(), 0);
       await page.waitForFunction(() => !window.__onlineHarness.online.loading);
       assert.equal(await page.locator('.scoreboard-row').count(), 10);
-      assert.match(await page.locator('#scoreboard-category-note').innerText(), /Custom setups/);
+      assert.match(await page.locator('#scoreboard-note').innerText(), /All driving setups/);
       await checkContrast(page, textSelectors);
       await bounds();
       await page.keyboard.press('Escape');
@@ -452,10 +445,9 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
       assert.equal(await page.locator('#scoreboard-dialog').isVisible(), false);
       await page.waitForFunction(() => !window.__onlineHarness.online.loading);
       assert.equal(await page.locator('#run-leaderboard .scoreboard-row').count(), 10);
-      assert.equal(
-        await page.locator('[data-score-category="custom"]').getAttribute('aria-pressed'),
-        'true',
-      );
+      assert.equal(await page.locator('[data-score-category]').count(), 0);
+      assert.equal(await page.locator('[data-entry-id="public-0"]').count(), 1);
+      assert.equal(await page.locator('[data-entry-id="public-1"]').count(), 1);
       assert.equal(await page.locator('#leaderboard-name').count(), 0);
       await page.waitForFunction(() => !!window.__onlineHarness.releaseFinish);
       await page.evaluate(() => window.__onlineHarness.releaseFinish());
@@ -466,7 +458,7 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
         return input.dataset.identity;
       });
       await page.keyboard.type('Coastal pal');
-      await page.evaluate(() => window.__onlineHarness.online.refresh('custom'));
+      await page.evaluate(() => window.__onlineHarness.online.refresh());
       await page.waitForFunction(() => !window.__onlineHarness.online.loading);
       assert.equal(await page.locator('#leaderboard-name').inputValue(), 'Coastal pal');
       assert.equal(
@@ -566,7 +558,7 @@ export async function checkOnlineScoreboard(browser, origin, errors = []) {
     }
   }
   console.log(
-    'PASS: worldwide-only top ten, inline automatic name entry, async focus/trap/Escape, draft retention, safe Enter, public-name escaping, rank races, offline states, matching categories and four responsive viewports.',
+    'PASS: worldwide-only top ten, inline automatic name entry, async focus/trap/Escape, draft retention, safe Enter, public-name escaping, rank races, offline states, combined driving setups and four responsive viewports.',
   );
 }
 

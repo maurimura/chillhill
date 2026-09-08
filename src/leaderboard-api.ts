@@ -30,8 +30,6 @@ export interface LeaderboardEntry {
   record: ScoreRecord;
 }
 export interface LeaderboardResponse {
-  version: number;
-  category: ScoreCategory;
   entries: LeaderboardEntry[];
 }
 export interface LeaderboardError {

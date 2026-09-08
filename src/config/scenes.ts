@@ -16,6 +16,8 @@ export const sceneKeys = [
   'roadside',
   'seed',
   'curves',
+  'curveLength',
+  'curveMix',
   'roadWidth',
   'grade',
   'terrainHeight',

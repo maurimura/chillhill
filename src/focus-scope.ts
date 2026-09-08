@@ -25,7 +25,13 @@ export class FocusScope {
           ...this.root.querySelectorAll<HTMLElement>(
             'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), summary, [tabindex="0"]',
           ),
-        ].filter((node) => node.getClientRects().length);
+        ].filter((node) => {
+          if (!node.getClientRects().length) return false;
+          // Closed details can retain descendant layout boxes, even though only
+          // their summary participates in keyboard navigation.
+          const closed = node.closest('details:not([open])');
+          return !closed || !!closed.querySelector(':scope > summary')?.contains(node);
+        });
         const first = stops[0],
           last = stops.at(-1);
         if (event.shiftKey && document.activeElement === first) {

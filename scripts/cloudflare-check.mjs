@@ -7,13 +7,13 @@ const target = new URL(process.env.CLOUDFLARE_TEST_URL ?? 'http://127.0.0.1:8787
 assert.ok(
   target.protocol === 'http:' &&
     ['127.0.0.1', 'localhost', '[::1]'].includes(target.hostname) &&
-    target.port === '8787' &&
+    target.port !== '' &&
     !target.username &&
     !target.password &&
     target.pathname === '/' &&
     !target.search &&
     !target.hash,
-  'Cloudflare smoke tests only run against a disposable localhost:8787 Worker.',
+  'Cloudflare smoke tests only run against a disposable localhost Worker on an explicit port.',
 );
 const testId = crypto.randomUUID();
 const nickname = `Local ${testId.slice(0, 8)}`;
@@ -54,16 +54,18 @@ async function api(path, options = {}, status = 200) {
 const html = await request('/', { headers: { Accept: 'text/html' } });
 assert.equal(html.status, 200);
 assert.match(html.headers.get('content-type') ?? '', /text\/html/);
+assert.match(html.headers.get('content-security-policy') ?? '', /script-src 'self'/);
+assert.equal(html.headers.get('x-frame-options'), 'DENY');
+assert.equal(html.headers.get('x-content-type-options'), 'nosniff');
 const markup = await html.text();
 assert.match(markup, /chillhill/i);
 const script = /<script[^>]+src="([^"]+)"/.exec(markup)?.[1];
 assert.ok(script, 'Built game entry point is linked.');
 assert.equal((await request(script)).status, 200, 'Built JavaScript is served.');
 await api('/api/not-a-real-route', {}, 404);
-await api('/api/leaderboard?category=toString', {}, 400);
 await api('/api/runs', {}, 405);
-const before = await api('/api/leaderboard?category=standard');
-assert.equal(before.version, scoringDefaults.version);
+const before = await api('/api/leaderboard');
+assert.equal(Object.hasOwn(before, 'version'), false);
 assert.ok(
   before.entries.length < 10,
   'Use an isolated local D1 state directory; its test board is full.',
@@ -129,20 +131,33 @@ assert.equal(published.qualified, true);
 assert.deepEqual(await api(name, { data: { token: session.token, name: nickname } }), published);
 await api(name, { data: { token: session.token, name: 'Other local name' } }, 409);
 
-const after = await api('/api/leaderboard?category=standard');
+const after = await api('/api/leaderboard');
 const entry = after.entries.find((entry) => entry.record.id === testId);
 assert.equal(entry?.name, nickname);
 assert.equal(entry?.record.score, 70);
 assert.ok(after.entries.length <= 10);
 assert.equal(JSON.stringify(after).includes(session.token), false);
 assert.equal(JSON.stringify(after).includes('token_hash'), false);
-const custom = await api('/api/leaderboard?category=custom');
-assert.equal(
-  custom.entries.some((entry) => entry.record.id === testId),
-  false,
+const legacy = await api('/api/leaderboard?category=custom');
+assert.deepEqual(legacy, after, 'Legacy category links use the same combined board.');
+let limited = false;
+for (let attempt = 0; attempt < 65; attempt++) {
+  const response = await request(`/api/leaderboard?category=standard&nonce=${attempt}`);
+  if (response.status === 429) {
+    assert.equal(response.headers.get('retry-after'), '60');
+    limited = true;
+    break;
+  }
+  assert.equal(response.status, 200);
+}
+assert.ok(
+  limited,
+  'The real edge binding limits leaderboard reads despite changing query strings.',
 );
+assert.equal((await request('/')).status, 200, 'API throttling leaves the game available.');
+await api('/api/preferences');
 console.log(
-  `Cloudflare local smoke passed: assets, D1 ranking, name entry, retries and invalid requests (${((performance.now() - started) / 1000).toFixed(1)}s).`,
+  `Cloudflare local smoke passed: assets, D1 ranking, name entry, retries, invalid requests and edge rate limits (${((performance.now() - started) / 1000).toFixed(1)}s).`,
 );
 console.log(
   'One synthetic nickname was written to the disposable local D1 database; production was not contacted.',

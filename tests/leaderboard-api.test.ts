@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { handleRequest, type Database, type Statement, type Env } from '../worker/index.ts';
 import { scoringDefaults, standardDriving } from '../src/config/scoring.ts';
@@ -15,9 +15,11 @@ class SQLite implements Database {
   error: unknown;
   executions = new WeakMap<Statement, () => unknown[]>();
   constructor() {
-    this.db.exec(
-      readFileSync(new URL('../migrations/0001_leaderboard.sql', import.meta.url), 'utf8'),
-    );
+    const migrations = new URL('../migrations/', import.meta.url);
+    for (const file of readdirSync(migrations)
+      .filter((name) => name.endsWith('.sql'))
+      .sort())
+      this.db.exec(readFileSync(new URL(file, migrations), 'utf8'));
   }
   prepare(sql: string): Statement {
     let values: (string | number | null)[] = [];
@@ -78,7 +80,11 @@ test('country preferences use edge metadata only, without requiring D1 or exposi
 });
 function setup() {
   const DB = new SQLite();
-  const env: Env = { DB, ASSETS: { fetch: async () => new Response('game assets') } };
+  const env: Env = {
+    DB,
+    ASSETS: { fetch: async () => new Response('game assets') },
+    API_RATE_LIMITER: { limit: async () => ({ success: true }) },
+  };
   async function call(
     path: string,
     data?: unknown,
@@ -103,9 +109,9 @@ function setup() {
       now,
     );
   }
-  async function start(category = 'standard') {
+  async function start(category = 'standard', version = scoringDefaults.version) {
     const response = await call('/api/runs', {
-      version: scoringDefaults.version,
+      version,
       car: 'astra',
       seed: 42,
       category,
@@ -182,7 +188,7 @@ test('sessions use hashed capabilities; finishing/name flow is idempotent and pu
   );
 });
 
-test('only current top ten positive named scores qualify; late names are rechecked and categories stay separate', async () => {
+test('all setups and versions share ten positive named scores; late names are rechecked globally', async () => {
   const { DB, call, start, finish, name } = setup();
   const late = await start();
   assert.deepEqual(
@@ -192,8 +198,13 @@ test('only current top ten positive named scores qualify; late names are recheck
     { qualified: true, rank: 1 },
   );
   for (let i = 0; i < 12; i++) {
-    const session = await start();
+    const category = i % 2 ? 'custom' : 'standard';
+    const version = (i % 3) + 1;
+    const session = await start(category, version);
     const row = record({
+      version,
+      category,
+      customReasons: category === 'custom' ? ['setup'] : [],
       score: 100 + i,
       earned: 120 + i,
       nearMissEarned: 120 + i,
@@ -233,8 +244,19 @@ test('only current top ten positive named scores qualify; late names are recheck
   const custom = await start('custom');
   await finish(custom, record({ category: 'custom', customReasons: ['setup'] }));
   assert.deepEqual(await (await name(custom)).json(), { qualified: true, rank: 1 });
-  assert.equal((await (await call('/api/leaderboard?category=custom')).json()).entries.length, 1);
-  assert.equal(DB.db.prepare('SELECT COUNT(*) AS count FROM leaderboard_entries').get()!.count, 11);
+  const combined = await (await call('/api/leaderboard')).json();
+  assert.equal(combined.entries.length, 10);
+  assert.deepEqual(
+    new Set(combined.entries.map((entry: { record: ScoreRecord }) => entry.record.category)),
+    new Set(['standard', 'custom']),
+  );
+  for (const category of ['standard', 'custom', 'unknown'])
+    assert.deepEqual(
+      await (await call(`/api/leaderboard?category=${category}`)).json(),
+      combined,
+      'legacy query parameters cannot split the board',
+    );
+  assert.equal(DB.db.prepare('SELECT COUNT(*) AS count FROM leaderboard_entries').get()!.count, 10);
 });
 
 test('finish cannot change its score or replay a client record under another session', async () => {
@@ -250,14 +272,70 @@ test('finish cannot change its score or replay a client record under another ses
   assert.equal((await finish(replay, row)).status, 409);
 });
 
+test('client version metadata does not restrict sessions or public ranking', async () => {
+  const { start, finish, name, call } = setup();
+  for (const version of [1, scoringDefaults.version, scoringDefaults.version + 1]) {
+    const session = await start('standard', version);
+    assert.equal((await finish(session, record({ version }))).status, 200);
+    assert.equal((await name(session, `Driver ${version}`)).status, 200);
+  }
+  const board = await (await call('/api/leaderboard')).json();
+  assert.equal(Object.hasOwn(board, 'version'), false);
+  assert.equal(board.entries.length, 3);
+});
+
+test('existing boards from every version merge on read without deleting records', async () => {
+  const { DB, call } = setup();
+  const insert = DB.db.prepare(`INSERT INTO leaderboard_entries
+    (run_id, record_id, version, category, name, score, near_misses, finished_at, record_json)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  for (let i = 0; i < 21; i++) {
+    const category = i % 2 ? 'custom' : 'standard';
+    const row = record({
+      category,
+      customReasons: category === 'custom' ? ['setup'] : [],
+      version: (i % 3) + 1,
+      score: 100 + i,
+      earned: 120 + i,
+      nearMissEarned: 120 + i,
+      driftEarned: 0,
+    });
+    insert.run(
+      crypto.randomUUID(),
+      row.id,
+      row.version,
+      category,
+      `Driver ${i}`,
+      row.score,
+      row.nearMisses,
+      row.finishedAt,
+      JSON.stringify(row),
+    );
+  }
+  DB.db.exec(
+    readFileSync(new URL('../migrations/0003_all_time_leaderboard.sql', import.meta.url), 'utf8'),
+  );
+  const board = await (await call('/api/leaderboard')).json();
+  assert.deepEqual(
+    board.entries.map((entry: { record: ScoreRecord }) => entry.record.score),
+    [120, 119, 118, 117, 116, 115, 114, 113, 112, 111],
+  );
+  assert.equal(DB.db.prepare('SELECT COUNT(*) AS count FROM leaderboard_entries').get()!.count, 21);
+});
+
 test('simultaneous name admissions keep exactly ten rows and one immutable name per run', async () => {
   const { DB, call, start, finish, name } = setup();
-  const candidates = await Promise.all(Array.from({ length: 15 }, () => start()));
+  const candidates = await Promise.all(
+    Array.from({ length: 15 }, (_, i) => start(i % 2 ? 'custom' : 'standard', (i % 3) + 1)),
+  );
   await Promise.all(
     candidates.map((session, i) =>
       finish(
         session,
         record({
+          version: (i % 3) + 1,
+          category: i % 2 ? 'custom' : 'standard',
+          customReasons: i % 2 ? ['setup'] : [],
           score: 100 + i,
           earned: 120 + i,
           nearMissEarned: 120 + i,
@@ -289,8 +367,17 @@ test('ties use near misses then server time, not a forged client completion date
   const first = await start();
   await finish(first, record(), epoch + 100_000);
   await name(first, 'First');
-  const second = await start();
-  await finish(second, record({ finishedAt: '2000-01-01T00:00:00Z' }), epoch + 110_000);
+  const second = await start('custom', 1);
+  await finish(
+    second,
+    record({
+      version: 1,
+      category: 'custom',
+      customReasons: ['setup'],
+      finishedAt: '2000-01-01T00:00:00Z',
+    }),
+    epoch + 110_000,
+  );
   await name(second, 'Second', epoch + 110_001);
   const third = await start();
   await finish(third, record({ nearMisses: 3 }), epoch + 120_000);
@@ -323,8 +410,9 @@ test('same-origin JSON writes, size limits, methods and alias validation fail sa
   assert.equal((await call('/api/runs', { text: 'x'.repeat(9000) })).status, 413);
   assert.equal((await call('/api/runs')).status, 405);
   assert.equal((await call('/api/missing')).status, 404);
-  assert.equal((await call('/api/leaderboard?category=unknown')).status, 400);
   assert.equal((await call('/api/runs', { ...settings, car: '__proto__' })).status, 400);
+  for (const version of [0, -1, 1.5, '1', null, Number.MAX_SAFE_INTEGER + 1])
+    assert.equal((await call('/api/runs', { ...settings, version })).status, 400);
   const session = await start();
   assert.equal((await name(session)).status, 409);
   await finish(session);
@@ -507,4 +595,90 @@ test('start requests are atomically rate-limited and static game assets remain i
     await (await handleRequest(new Request(origin + '/'), disconnected)).text(),
     'game assets',
   );
+});
+
+test('edge limits reject reads and writes before any D1 access or body consumption', async () => {
+  const { env } = setup();
+  env.DB = {
+    prepare: () => assert.fail('Rejected traffic must not query D1'),
+    batch: async () => assert.fail('Rejected traffic must not write to D1'),
+  };
+  env.API_RATE_LIMITER = { limit: async () => ({ success: false }) };
+  for (const path of [
+    '/api/leaderboard',
+    '/api/runs',
+    `/api/runs/${crypto.randomUUID()}/finish`,
+    `/api/runs/${crypto.randomUUID()}/name`,
+  ]) {
+    const request = new Request(origin + path, {
+      method: path === '/api/leaderboard' ? 'GET' : 'POST',
+    });
+    const response = await handleRequest(request, env, epoch);
+    assert.equal(response.status, 429, path);
+    assert.equal(response.headers.get('retry-after'), '60');
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    assert.equal(response.headers.get('x-frame-options'), 'DENY');
+    assert.match(response.headers.get('content-security-policy')!, /default-src 'none'/);
+    assert.equal(request.bodyUsed, false);
+  }
+  assert.equal((await handleRequest(new Request(origin + '/'), env)).status, 200);
+  assert.equal((await handleRequest(new Request(origin + '/api/preferences'), env)).status, 200);
+});
+
+test('edge buckets cannot be reset by changing category, run ID or forwarding headers', async () => {
+  const { env } = setup();
+  const keys: string[] = [];
+  env.API_RATE_LIMITER = {
+    limit: async ({ key }) => {
+      keys.push(key);
+      return { success: false };
+    },
+  };
+  async function limited(path: string, address = '192.0.2.1') {
+    return handleRequest(
+      new Request(origin + path, {
+        method: path.startsWith('/api/leaderboard') ? 'GET' : 'POST',
+        headers: { 'cf-connecting-ip': address, 'x-forwarded-for': crypto.randomUUID() },
+      }),
+      env,
+      epoch,
+    );
+  }
+  await limited('/api/leaderboard?category=standard');
+  await limited('/api/leaderboard?category=custom&cachebust=123');
+  assert.equal(keys[0], keys[1]);
+  await limited(`/api/runs/${crypto.randomUUID()}/finish`);
+  await limited(`/api/runs/${crypto.randomUUID()}/name`);
+  assert.equal(keys[2], keys[3]);
+  assert.notEqual(keys[0], keys[2], 'reading and writing have separate allowances');
+  await limited('/api/runs');
+  assert.notEqual(keys[4], keys[2], 'starting and finishing have separate allowances');
+  await limited('/api/runs', '192.0.2.2');
+  assert.notEqual(keys[4], keys[5]);
+  assert.equal(
+    keys.some((key) => key.includes('192.0.2.')),
+    false,
+  );
+});
+
+test('missing or broken edge limits fail closed without disabling the game', async () => {
+  const { env } = setup();
+  env.DB = {
+    prepare: () => assert.fail('Unavailable limiter must not reach D1'),
+    batch: async () => assert.fail('Unavailable limiter must not reach D1'),
+  };
+  for (const binding of [
+    undefined,
+    {
+      limit: async () => {
+        throw new Error('Private provider diagnostic');
+      },
+    },
+  ]) {
+    const unavailable = { ...env, API_RATE_LIMITER: binding } as Env;
+    const response = await handleRequest(new Request(origin + '/api/leaderboard'), unavailable);
+    assert.equal(response.status, 503);
+    assert.equal((await response.text()).includes('Private provider diagnostic'), false);
+    assert.equal((await handleRequest(new Request(origin + '/'), unavailable)).status, 200);
+  }
 });

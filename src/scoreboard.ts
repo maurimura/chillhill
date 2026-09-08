@@ -1,6 +1,7 @@
 import { cars, defaultCar, type CarId } from './config/cars.ts';
 import {
   isStandardDriving,
+  scoredSetting,
   scoringDefaults,
   standardDriving,
   type ScoredSettings,
@@ -8,8 +9,8 @@ import {
 import type { ChallengeState } from './game/challenge.ts';
 
 export type ScoreCategory = 'standard' | 'custom';
-// Older records stay untouched; unlike scoring systems must not share ranks.
-export const scoreStorageKey = `chillhill.scores.v${scoringDefaults.version}`;
+// One permanent board; older versioned keys remain readable as backups.
+export const scoreStorageKey = 'chillhill.scores';
 const reasonLabels = {
   setup: 'Custom driving setup',
   tuning: 'Driving settings changed during the run',
@@ -82,7 +83,7 @@ export function trackScoreSettings(run: ScoreRun, before: ScoredSettings, after:
   };
   if (
     (Object.keys(standardDriving) as (keyof typeof standardDriving)[]).some(
-      (key) => before[key] !== after[key],
+      (key) => scoredSetting(before, key) !== scoredSetting(after, key),
     )
   )
     add('tuning');
@@ -133,7 +134,8 @@ export function validScoreRecord(value: unknown): ScoreRecord | null {
   if (!value || typeof value !== 'object') return null;
   const row = value as ScoreRecord;
   if (
-    row.version !== scoringDefaults.version ||
+    !Number.isSafeInteger(row.version) ||
+    row.version < 1 ||
     !['standard', 'custom'].includes(row.category) ||
     typeof row.id !== 'string' ||
     !/^[\w-]{1,80}$/.test(row.id) ||
@@ -220,26 +222,27 @@ export function rankScores(records: readonly ScoreRecord[]): ScoreRecord[] {
       a.finishedAt.localeCompare(b.finishedAt) ||
       a.id.localeCompare(b.id),
   );
-  return (['standard', 'custom'] as const).flatMap((category) =>
-    sorted.filter((row) => row.category === category).slice(0, scoringDefaults.leaderboardSize),
-  );
+  return sorted.slice(0, scoringDefaults.leaderboardSize);
 }
 
 export function readScores(storage?: ScoreStorage): ScoreRecord[] {
-  try {
-    const raw = storage?.getItem(scoreStorageKey);
-    if (!raw || raw.length > 100000) return [];
-    const value = JSON.parse(raw);
-    if (
-      value.version !== scoringDefaults.version ||
-      !Array.isArray(value.records) ||
-      value.records.length > 100
-    )
-      return [];
-    return rankScores(value.records);
-  } catch {
-    return [];
+  const keys = [
+    scoreStorageKey,
+    ...Array.from({ length: scoringDefaults.version }, (_, i) => `chillhill.scores.v${i + 1}`),
+  ];
+  let records: ScoreRecord[] = [];
+  for (const key of keys) {
+    try {
+      const raw = storage?.getItem(key);
+      if (!raw || raw.length > 100000) continue;
+      const value = JSON.parse(raw);
+      if (!Array.isArray(value?.records) || value.records.length > 100) continue;
+      records = rankScores([...records, ...value.records]);
+    } catch {
+      // One corrupt or inaccessible save must not hide the other records.
+    }
   }
+  return records;
 }
 
 function browserStorage(): ScoreStorage | undefined {
@@ -265,16 +268,12 @@ export class ScoreboardStore {
   save(record: ScoreRecord): RunResult {
     this.refresh();
     const existing = this.records.find((row) => row.id === record.id);
-    const previousBest = this.records.find((row) => row.category === record.category)?.score ?? 0;
+    const previousBest = this.records[0]?.score ?? 0;
     this.records = rankScores([...this.records, record]);
-    const board = this.records.filter((row) => row.category === record.category);
-    const rank = board.findIndex((row) => row.id === record.id) + 1;
+    const rank = this.records.findIndex((row) => row.id === record.id) + 1;
     try {
       if (!this.storage) throw new Error('Storage is unavailable');
-      this.storage.setItem(
-        scoreStorageKey,
-        JSON.stringify({ version: scoringDefaults.version, records: this.records }),
-      );
+      this.storage.setItem(scoreStorageKey, JSON.stringify({ records: this.records }));
       this.persisted = true;
     } catch {
       this.persisted = false;

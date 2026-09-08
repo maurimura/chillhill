@@ -78,11 +78,8 @@ try {
         return route.fulfill({ json: { qualified: true, rank } });
       }
       if (url.pathname === '/api/leaderboard') {
-        const category = url.searchParams.get('category');
         return route.fulfill({
           json: {
-            version: scoringDefaults.version,
-            category,
             entries: Array.from({ length: 10 }, (_, i) =>
               postedName && i === rank - 1
                 ? { name: postedName, record: finished }
@@ -91,8 +88,9 @@ try {
                     record: {
                       ...record,
                       id: `public-${i}`,
-                      category,
-                      customReasons: category === 'standard' ? [] : ['setup'],
+                      version: (i % 3) + 1,
+                      category: i % 2 ? 'custom' : 'standard',
+                      customReasons: i % 2 ? ['setup'] : [],
                     },
                   },
             ),

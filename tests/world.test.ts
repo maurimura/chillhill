@@ -19,6 +19,8 @@ const settings = {
   landscape: 'coast',
   seed: 42,
   curves: 0.7,
+  curveLength: 1,
+  curveMix: 0.5,
   roadWidth: 10,
   grade: 0.06,
   terrainHeight: 0.7,

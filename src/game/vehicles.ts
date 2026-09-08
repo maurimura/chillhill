@@ -209,7 +209,10 @@ export function buildVehicle(id: CarId, roundness: number, themeColor: string): 
     z: number,
     plate = false,
   ) => {
-    const canvas = document.createElement('canvas');
+    const canvas =
+      typeof document === 'undefined'
+        ? new OffscreenCanvas(512, 128)
+        : document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 128;
     const context = canvas.getContext('2d')!;

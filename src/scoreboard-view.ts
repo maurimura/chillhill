@@ -1,14 +1,8 @@
 import { cars } from './config/cars.ts';
 import { FocusScope } from './focus-scope.ts';
-import { formatDistance, formatLength, formatSpeed, type UnitSystem } from './config/units.ts';
-import { standardDriving } from './config/scoring.ts';
+import { formatDistance, formatSpeed, type UnitSystem } from './config/units.ts';
 import type { OnlineScoreboard } from './online-scoreboard.ts';
-import {
-  customReasonLabel,
-  type RunResult,
-  type ScoreCategory,
-  type ScoreRecord,
-} from './scoreboard.ts';
+import { customReasonLabel, type RunResult, type ScoreRecord } from './scoreboard.ts';
 
 const escape = (value: string | number) =>
   String(value).replace(
@@ -31,7 +25,6 @@ export class ScoreboardView {
   readonly dialog: HTMLDialogElement;
   private content: HTMLDivElement;
   private embeddedHost: HTMLElement | null = null;
-  private category: ScoreCategory = 'standard';
   private result: RunResult | null = null;
   private units: UnitSystem = 'metric';
   private opener: HTMLElement | null = null;
@@ -58,8 +51,7 @@ export class ScoreboardView {
     this.content.innerHTML = `<div class="scoreboard-heading"><div><span class="eyebrow">DRIFT KING · TOP TEN</span><h2 id="scoreboard-title" tabindex="-1">The best roads.</h2></div><button class="icon-button" id="close-scoreboard" aria-label="Close scoreboard">×</button></div>
       <div class="scoreboard-body"><section id="scoreboard-result" aria-label="Last completed run" hidden></section>
       <section id="online-run" class="online-run" aria-label="Worldwide score entry" hidden></section>
-      <div class="scoreboard-tabs" id="scoreboard-categories" role="group" aria-label="Score category"><button data-score-category="standard" aria-pressed="true">Standard</button><button data-score-category="custom" aria-pressed="false">Custom</button></div>
-      <p id="scoreboard-category-note"></p><ol id="scoreboard-list" aria-label="Top ten runs"></ol><p class="online-privacy" id="leaderboard-privacy" hidden>2–20 characters. Your nickname and run stats will be public.</p></div>`;
+      <p id="scoreboard-note">Worldwide top ten · All driving setups</p><ol id="scoreboard-list" aria-label="Top ten runs"></ol><p class="online-privacy" id="leaderboard-privacy" hidden>2–20 characters. Your nickname and run stats will be public.</p></div>`;
     this.dialog.append(this.content);
     document.body.append(this.dialog);
     this.focus = new FocusScope(
@@ -77,7 +69,7 @@ export class ScoreboardView {
       'click',
       (event) => {
         if (!(event.target as HTMLElement).closest('[data-leaderboard-retry]')) return;
-        void this.online.refresh(this.category);
+        void this.online.refresh();
         // The failed-load button disappears while retrying. Keep keyboard focus
         // in the leaderboard instead of dropping it onto the game's shortcuts.
         this.content
@@ -150,17 +142,6 @@ export class ScoreboardView {
       },
       options,
     );
-    this.content.querySelectorAll<HTMLButtonElement>('[data-score-category]').forEach((button) =>
-      button.addEventListener(
-        'click',
-        () => {
-          this.category = button.dataset.scoreCategory as ScoreCategory;
-          this.render();
-          void this.online.refresh(this.category);
-        },
-        options,
-      ),
-    );
     this.dialog.addEventListener(
       'click',
       (event) => {
@@ -190,21 +171,17 @@ export class ScoreboardView {
     this.result = result;
     this.units = units;
     if (!this.open && this.content.parentElement !== host) host.append(this.content);
-    if (changed) {
-      this.category = result.record.category;
-    }
     if (changed || unitsChanged) this.render();
-    if (changed) void this.online.refresh(this.category);
+    if (changed) void this.online.refresh();
   }
   clearEmbedded() {
     if (!this.embeddedHost) return;
     this.embeddedHost = null;
     if (!this.open) this.dialog.append(this.content);
   }
-  show(category: ScoreCategory, result: RunResult | null, units: UnitSystem) {
+  show(result: RunResult | null, units: UnitSystem) {
     if (!this.online.enabled) return;
     this.opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    this.category = category;
     this.result = result;
     this.units = units;
     this.dialog.append(this.content);
@@ -219,7 +196,7 @@ export class ScoreboardView {
           : '#leaderboard-name:not(:disabled)',
       ) ?? this.dialog.querySelector<HTMLButtonElement>('#close-scoreboard')!
     ).focus();
-    void this.online.refresh(category);
+    void this.online.refresh();
   }
   syncUnits(units: UnitSystem) {
     if (this.units === units) return;
@@ -248,17 +225,6 @@ export class ScoreboardView {
     get('scoreboard-result').hidden = !this.result || inline;
     if (this.result) get('scoreboard-result').innerHTML = resultsMarkup(this.result, this.units);
     this.renderClaim();
-    get('scoreboard-categories').hidden = inline;
-    this.content
-      .querySelectorAll<HTMLButtonElement>('[data-score-category]')
-      .forEach((button) =>
-        button.setAttribute('aria-pressed', String(button.dataset.scoreCategory === this.category)),
-      );
-    get('scoreboard-category-note').textContent = inline
-      ? `Worldwide top ten · ${this.category === 'standard' ? 'Standard' : 'Custom'} driving`
-      : this.category === 'standard'
-        ? `Default driving difficulty: ${formatSpeed(standardDriving.maxSpeed, this.units)} cap, ${formatLength(standardDriving.roadWidth, this.units)} road, standard curves, slope and drift. Any starting car and scenery. Changing driving settings, route, or cars mid-run makes it Custom.`
-        : 'Custom setups and mid-run changes live here. Their difficulty varies, so these scores are kept separate from Standard.';
     this.renderRows();
   }
   private renderRows() {
@@ -267,12 +233,9 @@ export class ScoreboardView {
     const claim = this.online.result;
     const pending =
       claim?.recordId === this.result?.record.id &&
-      this.result?.record.category === this.category &&
       (claim?.status === 'qualified' || claim?.status === 'saving');
     const rows = this.online.entries.filter(
-      (entry) =>
-        entry.record.category === this.category &&
-        (!pending || entry.record.id !== claim!.recordId),
+      (entry) => !pending || entry.record.id !== claim!.recordId,
     );
     const nodes: HTMLElement[] = [];
     let fresh = false;
