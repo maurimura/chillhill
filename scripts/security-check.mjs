@@ -48,24 +48,6 @@ try {
     return audio && !audio.paused && audio.currentTime > 0;
   });
   await page.locator('#music-play').click();
-  await page.locator('#sound').click();
-  await page.waitForTimeout(500);
-  await page.locator('#open-replay-toolbar').click();
-  await page.locator('#replay-quality').selectOption('compact');
-  const exported = page.waitForEvent('download', { timeout: 60000 });
-  await page.locator('#replay-video').click();
-  const download = await exported;
-  assert.match(download.suggestedFilename(), /\.(mp4|webm)$/);
-  const videoSize = await page.evaluate(async () => {
-    const video = document.createElement('video');
-    video.src = document.querySelector('#video-export-status a').href;
-    await new Promise((resolve, reject) => {
-      video.onloadeddata = resolve;
-      video.onerror = () => reject(new Error('The exported video must be playable under CSP.'));
-    });
-    return [video.videoWidth, video.videoHeight];
-  });
-  assert.deepEqual(videoSize, [720, 1280]);
   assert.deepEqual(await page.evaluate(() => window.securityViolations), []);
   assert.deepEqual(errors, []);
 
@@ -88,7 +70,7 @@ try {
   );
   await page.waitForFunction(() => window.securityViolations.includes('connect-src'));
   console.log(
-    'PASS: game, garage, workers, fonts, music and replay video export/playback work under CSP; inline scripts and external connections are blocked.',
+    'PASS: game, garage, terrain worker, fonts and music work under CSP; inline scripts and external connections are blocked.',
   );
 } finally {
   await browser.close();

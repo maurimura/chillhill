@@ -95,8 +95,9 @@ require the normal commit/review/deployment process before affecting production.
   fonts, music and the terrain worker under CSP; inline-script injection and
   an external fetch were blocked by the browser.
 
-The combined replay/curves release also verifies worker video export, automatic
-download and local video playback under CSP. `media-src` permits `blob:` for
+Local verification of the combined replay/curves release also covered worker video
+export, automatic download and local video playback under CSP. CI security checks
+do not wait for a video download event. `media-src` permits `blob:` for
 generated clips alongside same-origin music. External connections and inline
 scripts remain blocked. Release verification passed all 294 unit tests; the
 dependency audit and scans of staged changes and 70 Git commits reported no findings.
