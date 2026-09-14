@@ -45,7 +45,7 @@
     "three": "^0.185.1"
   },
   "devDependencies": {
-    "@types/node": "^26.4.1",
+    "@types/node": "^26.5.1",
     "@types/three": "^0.185.4",
     "playwright": "^1.63.0",
     "prettier": "^3.9.6",
